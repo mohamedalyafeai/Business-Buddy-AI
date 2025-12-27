@@ -1,9 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, Sparkles, X, MessageCircle } from "lucide-react";
+import { Send, Bot, User, Sparkles, X, MessageCircle, History, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 type Message = { role: "user" | "assistant"; content: string };
+type Conversation = { id: string; title: string; created_at: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-demo`;
 
@@ -14,10 +18,14 @@ const suggestedQuestions = [
 ];
 
 export const ChatDemoWidget = () => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -28,12 +36,137 @@ export const ChatDemoWidget = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Load conversations when user logs in
+  useEffect(() => {
+    if (user) {
+      loadConversations();
+    } else {
+      setConversations([]);
+      setCurrentConversationId(null);
+    }
+  }, [user]);
+
+  const loadConversations = async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from("chat_conversations")
+      .select("id, title, created_at")
+      .order("updated_at", { ascending: false });
+    
+    if (error) {
+      console.error("Error loading conversations:", error);
+      return;
+    }
+    
+    setConversations(data || []);
+  };
+
+  const loadConversation = async (conversationId: string) => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("role, content")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
+    
+    if (error) {
+      console.error("Error loading messages:", error);
+      return;
+    }
+    
+    setMessages(data as Message[] || []);
+    setCurrentConversationId(conversationId);
+    setShowHistory(false);
+  };
+
+  const createNewConversation = async (): Promise<string | null> => {
+    if (!user) return null;
+    
+    const { data, error } = await supabase
+      .from("chat_conversations")
+      .insert({ user_id: user.id, title: "New Chat" })
+      .select("id")
+      .single();
+    
+    if (error) {
+      console.error("Error creating conversation:", error);
+      return null;
+    }
+    
+    await loadConversations();
+    return data.id;
+  };
+
+  const saveMessage = async (conversationId: string, role: "user" | "assistant", content: string) => {
+    if (!user) return;
+    
+    await supabase.from("chat_messages").insert({
+      conversation_id: conversationId,
+      user_id: user.id,
+      role,
+      content,
+    });
+
+    // Update conversation title based on first user message
+    if (role === "user" && messages.length === 0) {
+      const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
+      await supabase
+        .from("chat_conversations")
+        .update({ title })
+        .eq("id", conversationId);
+      await loadConversations();
+    }
+  };
+
+  const deleteConversation = async (conversationId: string) => {
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from("chat_conversations")
+      .delete()
+      .eq("id", conversationId);
+    
+    if (error) {
+      toast.error("Failed to delete conversation");
+      return;
+    }
+    
+    if (currentConversationId === conversationId) {
+      setMessages([]);
+      setCurrentConversationId(null);
+    }
+    
+    await loadConversations();
+    toast.success("Conversation deleted");
+  };
+
+  const startNewChat = () => {
+    setMessages([]);
+    setCurrentConversationId(null);
+    setShowHistory(false);
+  };
+
   const streamChat = async (userMessage: string) => {
     const userMsg: Message = { role: "user", content: userMessage };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setIsLoading(true);
     setInput("");
+
+    let conversationId = currentConversationId;
+    
+    // Create new conversation if user is logged in and no current conversation
+    if (user && !conversationId) {
+      conversationId = await createNewConversation();
+      setCurrentConversationId(conversationId);
+    }
+
+    // Save user message
+    if (user && conversationId) {
+      await saveMessage(conversationId, "user", userMessage);
+    }
 
     let assistantContent = "";
 
@@ -96,6 +229,11 @@ export const ChatDemoWidget = () => {
           }
         }
       }
+
+      // Save assistant message
+      if (user && conversationId && assistantContent) {
+        await saveMessage(conversationId, "assistant", assistantContent);
+      }
     } catch (error) {
       console.error("Chat error:", error);
       setMessages((prev) => [
@@ -151,16 +289,80 @@ export const ChatDemoWidget = () => {
                   <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
                     <Sparkles className="w-5 h-5 text-primary" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-semibold text-sm">AI Agent Demo</h3>
-                    <p className="text-xs text-muted-foreground">Try it now - no signup needed</p>
+                    <p className="text-xs text-muted-foreground">
+                      {user ? "Your chats are saved" : "Sign in to save chats"}
+                    </p>
                   </div>
-                  <div className="ml-auto flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-xs text-muted-foreground">Online</span>
+                  <div className="flex items-center gap-1">
+                    {user && (
+                      <>
+                        <button
+                          onClick={startNewChat}
+                          className="p-1.5 rounded-lg hover:bg-background/50 transition-colors"
+                          title="New chat"
+                        >
+                          <Plus className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={() => setShowHistory(!showHistory)}
+                          className={`p-1.5 rounded-lg hover:bg-background/50 transition-colors ${showHistory ? "bg-background/50" : ""}`}
+                          title="Chat history"
+                        >
+                          <History className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </>
+                    )}
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-2" />
                   </div>
                 </div>
               </div>
+
+              {/* History panel */}
+              <AnimatePresence>
+                {showHistory && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="border-b border-border/30 overflow-hidden"
+                  >
+                    <div className="p-3 max-h-40 overflow-y-auto space-y-1">
+                      {conversations.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-2">
+                          No saved conversations yet
+                        </p>
+                      ) : (
+                        conversations.map((conv) => (
+                          <div
+                            key={conv.id}
+                            className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-background/50 transition-colors ${
+                              currentConversationId === conv.id ? "bg-background/50" : ""
+                            }`}
+                          >
+                            <button
+                              onClick={() => loadConversation(conv.id)}
+                              className="flex-1 text-left text-sm truncate"
+                            >
+                              {conv.title}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteConversation(conv.id);
+                              }}
+                              className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Messages area */}
               <div className="h-64 lg:h-72 overflow-y-auto p-4 space-y-3">
