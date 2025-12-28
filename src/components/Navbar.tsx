@@ -72,6 +72,10 @@ export const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate("/profile")}>
+                    <User className="w-4 h-4 mr-2" />
+                    Profile
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out
@@ -129,6 +133,10 @@ export const Navbar = () => {
                         {user.user_metadata?.display_name || user.email?.split("@")[0]}
                       </span>
                     </div>
+                    <Button variant="ghost" onClick={() => { navigate("/profile"); setIsOpen(false); }}>
+                      <User className="w-4 h-4 mr-2" />
+                      Profile
+                    </Button>
                     <Button variant="ghost" onClick={handleSignOut}>
                       <LogOut className="w-4 h-4 mr-2" />
                       Sign Out
