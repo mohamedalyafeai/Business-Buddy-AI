@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Sparkles, LogOut, User } from "lucide-react";
+import { Menu, X, Sparkles, LogOut, User, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
@@ -72,6 +72,10 @@ export const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                    <LayoutDashboard className="w-4 h-4 mr-2" />
+                    Dashboard
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/profile")}>
                     <User className="w-4 h-4 mr-2" />
                     Profile
@@ -133,6 +137,10 @@ export const Navbar = () => {
                         {user.user_metadata?.display_name || user.email?.split("@")[0]}
                       </span>
                     </div>
+                    <Button variant="ghost" onClick={() => { navigate("/dashboard"); setIsOpen(false); }}>
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      Dashboard
+                    </Button>
                     <Button variant="ghost" onClick={() => { navigate("/profile"); setIsOpen(false); }}>
                       <User className="w-4 h-4 mr-2" />
                       Profile
