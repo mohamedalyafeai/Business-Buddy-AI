@@ -149,6 +149,15 @@ const Profile = () => {
 
       if (error) throw error;
 
+      // Send profile update notification email
+      try {
+        await supabase.functions.invoke("send-notification-email", {
+          body: { type: "profile_update", email: user.email, displayName: data.displayName },
+        });
+      } catch (emailError) {
+        console.error("Failed to send profile update email:", emailError);
+      }
+
       toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Error updating profile:", error);

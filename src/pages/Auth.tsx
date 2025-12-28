@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sparkles, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -87,6 +88,14 @@ export default function Auth() {
             toast.error(error.message);
           }
         } else {
+          // Send welcome email
+          try {
+            await supabase.functions.invoke("send-notification-email", {
+              body: { type: "welcome", email, displayName },
+            });
+          } catch (emailError) {
+            console.error("Failed to send welcome email:", emailError);
+          }
           toast.success("Account created successfully!");
           navigate("/");
         }
