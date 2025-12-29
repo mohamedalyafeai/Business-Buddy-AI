@@ -1,13 +1,21 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageSquare, Calendar, TrendingUp, Clock, Loader2, Trash2 } from "lucide-react";
+import { MessageSquare, Calendar, TrendingUp, Clock, Loader2, Trash2, Download, FileJson, FileText } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { format, subDays, startOfDay } from "date-fns";
+import { useChatNotifications } from "@/hooks/useChatNotifications";
+import { exportAsJSON, exportAsPDF } from "@/lib/exportChat";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Conversation {
   id: string;
@@ -36,6 +44,10 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
+
+  // Enable real-time notifications
+  useChatNotifications();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -130,6 +142,40 @@ const Dashboard = () => {
       toast.error("Failed to delete conversation");
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleExport = async (conversationId: string, exportType: "json" | "pdf") => {
+    setExporting(conversationId);
+    try {
+      const conversation = conversations.find((c) => c.id === conversationId);
+      if (!conversation) throw new Error("Conversation not found");
+
+      const { data: messages, error } = await supabase
+        .from("chat_messages")
+        .select("role, content, created_at")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      const exportData = {
+        conversation,
+        messages: messages || [],
+      };
+
+      if (exportType === "json") {
+        exportAsJSON(exportData);
+        toast.success("Exported as JSON");
+      } else {
+        exportAsPDF(exportData);
+        toast.success("Exported as PDF");
+      }
+    } catch (error) {
+      console.error("Error exporting:", error);
+      toast.error("Failed to export conversation");
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -240,19 +286,47 @@ const Dashboard = () => {
                         </span>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDeleteConversation(conversation.id)}
-                      disabled={deleting === conversation.id}
-                    >
-                      {deleting === conversation.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-primary"
+                            disabled={exporting === conversation.id}
+                          >
+                            {exporting === conversation.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleExport(conversation.id, "json")}>
+                            <FileJson className="h-4 w-4 mr-2" />
+                            Export as JSON
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleExport(conversation.id, "pdf")}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Export as PDF
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteConversation(conversation.id)}
+                        disabled={deleting === conversation.id}
+                      >
+                        {deleting === conversation.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
