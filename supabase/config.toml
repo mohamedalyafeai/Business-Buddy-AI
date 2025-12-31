@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.productivity-insights]
 verify_jwt = false
+
+[functions.execute-workflow]
+verify_jwt = false
