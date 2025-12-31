@@ -100,6 +100,51 @@ export type Database = {
         }
         Relationships: []
       }
+      workflows: {
+        Row: {
+          ai_action_type: string
+          ai_config: Json | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          output_action_type: string
+          output_config: Json | null
+          trigger_config: Json | null
+          trigger_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_action_type: string
+          ai_config?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          output_action_type: string
+          output_config?: Json | null
+          trigger_config?: Json | null
+          trigger_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_action_type?: string
+          ai_config?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          output_action_type?: string
+          output_config?: Json | null
+          trigger_config?: Json | null
+          trigger_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
