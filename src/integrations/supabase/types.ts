@@ -100,10 +100,55 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_executions: {
+        Row: {
+          completed_at: string | null
+          context: Json | null
+          error: string | null
+          id: string
+          results: Json | null
+          started_at: string
+          status: string
+          user_id: string
+          workflow_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          context?: Json | null
+          error?: string | null
+          id?: string
+          results?: Json | null
+          started_at?: string
+          status?: string
+          user_id: string
+          workflow_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          context?: Json | null
+          error?: string | null
+          id?: string
+          results?: Json | null
+          started_at?: string
+          status?: string
+          user_id?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_executions_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflows: {
         Row: {
           ai_action_type: string
           ai_config: Json | null
+          conditions: Json | null
           created_at: string
           id: string
           is_active: boolean
@@ -118,6 +163,7 @@ export type Database = {
         Insert: {
           ai_action_type: string
           ai_config?: Json | null
+          conditions?: Json | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -132,6 +178,7 @@ export type Database = {
         Update: {
           ai_action_type?: string
           ai_config?: Json | null
+          conditions?: Json | null
           created_at?: string
           id?: string
           is_active?: boolean
