@@ -48,10 +48,19 @@ interface WorkflowNode {
 interface Condition {
   id: string;
   field: string;
-  operator: "contains" | "equals" | "not_equals" | "greater_than" | "less_than" | "is_empty" | "is_not_empty";
+  operator: "contains" | "equals" | "not_equals" | "greater_than" | "less_than" | "greater_than_or_equal" | "less_than_or_equal" | "is_empty" | "is_not_empty" | "regex_match" | "starts_with" | "ends_with";
   value: string;
   thenAction: string;
   elseAction: string;
+}
+
+interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  nodes: Omit<WorkflowNode, "id">[];
+  conditions: Omit<Condition, "id">[];
 }
 
 interface Workflow {
@@ -109,6 +118,76 @@ const nodeTypes = {
     { id: "condition", label: "Condition", icon: GitBranch, description: "Branch based on data" },
   ],
 };
+
+const workflowTemplates: WorkflowTemplate[] = [
+  {
+    id: "email_digest",
+    name: "Email Digest",
+    description: "Summarize content and send a daily digest email",
+    icon: Mail,
+    nodes: [
+      { type: "trigger", nodeType: "schedule", config: { time: "09:00", frequency: "daily" }, label: "Schedule" },
+      { type: "ai", nodeType: "ai_summarize", config: { prompt: "Create a concise digest summary of the following content. Include key highlights and action items." }, label: "AI Summarize" },
+      { type: "action", nodeType: "send_email", config: { subject: "Your Daily Digest" }, label: "Send Email" },
+    ],
+    conditions: [],
+  },
+  {
+    id: "task_reminder",
+    name: "Task Reminder",
+    description: "Analyze priorities and create task reminders",
+    icon: CheckSquare,
+    nodes: [
+      { type: "trigger", nodeType: "schedule", config: { time: "08:00", frequency: "daily" }, label: "Schedule" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze the current tasks and identify high-priority items that need immediate attention. Suggest a priority order." }, label: "AI Analyze" },
+      { type: "action", nodeType: "create_task", config: { priority: "high", title: "Priority Tasks Review" }, label: "Create Task" },
+    ],
+    conditions: [],
+  },
+  {
+    id: "content_summarizer",
+    name: "Content Summarizer",
+    description: "Summarize long content with sentiment-based routing",
+    icon: FileText,
+    nodes: [
+      { type: "trigger", nodeType: "webhook", config: {}, label: "Webhook" },
+      { type: "ai", nodeType: "ai_summarize", config: { prompt: "Provide a comprehensive summary of this content, extracting the main points and key insights." }, label: "AI Summarize" },
+      { type: "condition", nodeType: "condition", config: {}, label: "Condition" },
+      { type: "action", nodeType: "save_data", config: {}, label: "Save Data" },
+    ],
+    conditions: [
+      { field: "sentiment", operator: "equals", value: "positive", thenAction: "continue", elseAction: "skip" },
+    ],
+  },
+  {
+    id: "smart_responder",
+    name: "Smart Auto-Responder",
+    description: "AI-powered email response with urgency detection",
+    icon: MessageSquare,
+    nodes: [
+      { type: "trigger", nodeType: "email_received", config: {}, label: "Email Received" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this email for urgency level (1-10) and sentiment. Extract key questions that need answers." }, label: "AI Analyze" },
+      { type: "condition", nodeType: "condition", config: {}, label: "Condition" },
+      { type: "ai", nodeType: "ai_respond", config: { prompt: "Draft a professional and helpful response addressing the key points." }, label: "AI Respond" },
+      { type: "action", nodeType: "send_email", config: { subject: "Re: Your Message" }, label: "Send Email" },
+    ],
+    conditions: [
+      { field: "lastAiOutput", operator: "regex_match", value: "urgency.*[7-9]|urgency.*10", thenAction: "continue", elseAction: "skip" },
+    ],
+  },
+  {
+    id: "weekly_report",
+    name: "Weekly Report Generator",
+    description: "Generate and email weekly performance reports",
+    icon: Calendar,
+    nodes: [
+      { type: "trigger", nodeType: "schedule", config: { time: "17:00", frequency: "weekly" }, label: "Schedule" },
+      { type: "ai", nodeType: "ai_draft", config: { prompt: "Create a professional weekly report summarizing achievements, metrics, and areas for improvement. Format with clear sections." }, label: "AI Draft" },
+      { type: "action", nodeType: "send_email", config: { subject: "Weekly Performance Report" }, label: "Send Email" },
+    ],
+    conditions: [],
+  },
+];
 
 // Convert DB workflow to UI workflow
 const dbToUiWorkflow = (dbWorkflow: DbWorkflow): Workflow => {
@@ -170,6 +249,7 @@ export const WorkflowBuilder = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [conditionDialogOpen, setConditionDialogOpen] = useState(false);
   const [editingCondition, setEditingCondition] = useState<Condition | null>(null);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
 
   // Load workflows from database
   useEffect(() => {
@@ -241,6 +321,38 @@ export const WorkflowBuilder = () => {
     setNewWorkflowName("");
     setIsCreating(false);
     toast.success("Workflow created! Add nodes and save to persist.");
+  };
+
+  const createFromTemplate = (template: WorkflowTemplate) => {
+    if (!user) {
+      toast.error("Please sign in to create workflows");
+      return;
+    }
+
+    const timestamp = Date.now();
+    const nodes: WorkflowNode[] = template.nodes.map((node, index) => ({
+      ...node,
+      id: `${timestamp}-${index}`,
+    }));
+
+    const conditions: Condition[] = template.conditions.map((condition, index) => ({
+      ...condition,
+      id: nodes.find(n => n.type === "condition")?.id || `condition-${timestamp}-${index}`,
+    }));
+
+    const newWorkflow: Workflow = {
+      id: timestamp.toString(),
+      name: template.name,
+      nodes,
+      conditions,
+      isActive: false,
+      isSaved: false,
+    };
+
+    setWorkflows([newWorkflow, ...workflows]);
+    setSelectedWorkflow(newWorkflow);
+    setTemplateDialogOpen(false);
+    toast.success(`Created workflow from "${template.name}" template!`);
   };
 
   const saveWorkflow = async (workflow: Workflow) => {
@@ -636,6 +748,49 @@ export const WorkflowBuilder = () => {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
+          <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <FileText className="w-4 h-4 mr-2" />
+                Templates
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Workflow Templates</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground mb-4">
+                Choose a template to quickly create a pre-configured workflow
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {workflowTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => createFromTemplate(template)}
+                    className="flex items-start gap-4 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+                  >
+                    <div className="p-3 rounded-lg bg-primary/10">
+                      <template.icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-foreground">{template.name}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {template.nodes.length} nodes
+                        </Badge>
+                        {template.conditions.length > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            {template.conditions.length} conditions
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button onClick={() => setIsCreating(true)} size="sm">
             <Plus className="w-4 h-4 mr-2" />
             New Workflow
@@ -1105,6 +1260,9 @@ export const WorkflowBuilder = () => {
                     <SelectItem value="sentiment">AI Sentiment</SelectItem>
                     <SelectItem value="lastAiOutput">AI Output</SelectItem>
                     <SelectItem value="lastOutput">Last Output</SelectItem>
+                    <SelectItem value="urgency">Urgency Score</SelectItem>
+                    <SelectItem value="wordCount">Word Count</SelectItem>
+                    <SelectItem value="category">Category</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1121,15 +1279,38 @@ export const WorkflowBuilder = () => {
                     <SelectItem value="contains">Contains</SelectItem>
                     <SelectItem value="equals">Equals</SelectItem>
                     <SelectItem value="not_equals">Not Equals</SelectItem>
+                    <SelectItem value="starts_with">Starts With</SelectItem>
+                    <SelectItem value="ends_with">Ends With</SelectItem>
+                    <SelectItem value="regex_match">Regex Match</SelectItem>
+                    <SelectItem value="greater_than">Greater Than (&gt;)</SelectItem>
+                    <SelectItem value="less_than">Less Than (&lt;)</SelectItem>
+                    <SelectItem value="greater_than_or_equal">Greater Than or Equal (≥)</SelectItem>
+                    <SelectItem value="less_than_or_equal">Less Than or Equal (≤)</SelectItem>
                     <SelectItem value="is_empty">Is Empty</SelectItem>
                     <SelectItem value="is_not_empty">Is Not Empty</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {editingCondition.operator === "regex_match" && (
+                <p className="text-xs text-muted-foreground">
+                  Enter a valid JavaScript regex pattern (e.g., <code className="bg-muted px-1 rounded">urgent|critical</code> or <code className="bg-muted px-1 rounded">[0-9]+</code>)
+                </p>
+              )}
+              {["greater_than", "less_than", "greater_than_or_equal", "less_than_or_equal"].includes(editingCondition.operator) && (
+                <p className="text-xs text-muted-foreground">
+                  Enter a numeric value for comparison
+                </p>
+              )}
               <div>
                 <Label>Value</Label>
                 <Input
-                  placeholder="Value to compare..."
+                  placeholder={
+                    editingCondition.operator === "regex_match" 
+                      ? "Regex pattern..." 
+                      : ["greater_than", "less_than", "greater_than_or_equal", "less_than_or_equal"].includes(editingCondition.operator)
+                        ? "Numeric value..."
+                        : "Value to compare..."
+                  }
                   value={editingCondition.value}
                   onChange={(e) => setEditingCondition({ ...editingCondition, value: e.target.value })}
                 />

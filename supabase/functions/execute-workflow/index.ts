@@ -18,7 +18,7 @@ interface WorkflowNode {
 interface Condition {
   id: string;
   field: string;
-  operator: "contains" | "equals" | "not_equals" | "greater_than" | "less_than" | "is_empty" | "is_not_empty";
+  operator: "contains" | "equals" | "not_equals" | "greater_than" | "less_than" | "greater_than_or_equal" | "less_than_or_equal" | "is_empty" | "is_not_empty" | "regex_match" | "starts_with" | "ends_with";
   value: string;
   thenAction: string;
   elseAction: string;
@@ -37,6 +37,8 @@ const evaluateCondition = (condition: Condition, context: Record<string, unknown
   const fieldValue = String(context[condition.field] || context.lastAiOutput || context.lastOutput || "");
   const compareValue = condition.value;
 
+  console.log(`Evaluating condition: ${condition.field} ${condition.operator} "${compareValue}" (actual value: "${fieldValue}")`);
+
   switch (condition.operator) {
     case "contains":
       return fieldValue.toLowerCase().includes(compareValue.toLowerCase());
@@ -44,15 +46,32 @@ const evaluateCondition = (condition: Condition, context: Record<string, unknown
       return fieldValue.toLowerCase() === compareValue.toLowerCase();
     case "not_equals":
       return fieldValue.toLowerCase() !== compareValue.toLowerCase();
+    case "starts_with":
+      return fieldValue.toLowerCase().startsWith(compareValue.toLowerCase());
+    case "ends_with":
+      return fieldValue.toLowerCase().endsWith(compareValue.toLowerCase());
+    case "regex_match":
+      try {
+        const regex = new RegExp(compareValue, "i");
+        return regex.test(fieldValue);
+      } catch (e) {
+        console.error("Invalid regex pattern:", compareValue, e);
+        return false;
+      }
     case "greater_than":
       return parseFloat(fieldValue) > parseFloat(compareValue);
     case "less_than":
       return parseFloat(fieldValue) < parseFloat(compareValue);
+    case "greater_than_or_equal":
+      return parseFloat(fieldValue) >= parseFloat(compareValue);
+    case "less_than_or_equal":
+      return parseFloat(fieldValue) <= parseFloat(compareValue);
     case "is_empty":
       return !fieldValue || fieldValue.trim() === "";
     case "is_not_empty":
       return !!fieldValue && fieldValue.trim() !== "";
     default:
+      console.log(`Unknown operator: ${condition.operator}`);
       return false;
   }
 };
