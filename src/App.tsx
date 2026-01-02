@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { WorkAssistantWidget } from "@/components/WorkAssistantWidget";
+import { FloatingWidget } from "@/components/FloatingWidget";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
           <WorkAssistantWidget />
+          <FloatingWidget />
         </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>

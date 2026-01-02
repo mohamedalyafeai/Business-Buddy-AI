@@ -37,6 +37,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
+interface WorkflowVariable {
+  key: string;
+  value: string;
+  description?: string;
+}
+
 interface WorkflowNode {
   id: string;
   type: "trigger" | "action" | "ai" | "condition";
@@ -68,8 +74,10 @@ interface Workflow {
   name: string;
   nodes: WorkflowNode[];
   conditions: Condition[];
+  variables: WorkflowVariable[];
   isActive: boolean;
   isSaved?: boolean;
+  webhookUrl?: string;
 }
 
 interface DbWorkflow {
@@ -223,13 +231,23 @@ const dbToUiWorkflow = (dbWorkflow: DbWorkflow): Workflow => {
     });
   }
   
+  // Extract variables from trigger_config
+  const variables: WorkflowVariable[] = (dbWorkflow.trigger_config as Record<string, unknown>)?.variables as WorkflowVariable[] || [];
+  
+  // Generate webhook URL for webhook triggers
+  const webhookUrl = dbWorkflow.trigger_type === 'webhook' 
+    ? `https://zyediimmjjssdbfekaiu.supabase.co/functions/v1/webhook-trigger/${dbWorkflow.id}`
+    : undefined;
+
   return {
     id: dbWorkflow.id,
     name: dbWorkflow.name,
     nodes,
     conditions: (dbWorkflow.conditions as Condition[]) || [],
+    variables,
     isActive: dbWorkflow.is_active,
     isSaved: true,
+    webhookUrl,
   };
 };
 
@@ -312,6 +330,7 @@ export const WorkflowBuilder = () => {
       name: newWorkflowName,
       nodes: [],
       conditions: [],
+      variables: [],
       isActive: false,
       isSaved: false,
     };
@@ -345,6 +364,7 @@ export const WorkflowBuilder = () => {
       name: template.name,
       nodes,
       conditions,
+      variables: [],
       isActive: false,
       isSaved: false,
     };
@@ -368,15 +388,21 @@ export const WorkflowBuilder = () => {
       const aiNode = workflow.nodes.find(n => n.type === "ai");
       const actionNode = workflow.nodes.find(n => n.type === "action");
 
-      const workflowData = {
+      const triggerConfig = JSON.parse(JSON.stringify({
+        ...(triggerNode?.config || {}),
+        variables: workflow.variables || [],
+      }));
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const workflowData: any = {
         user_id: user.id,
         name: workflow.name,
         trigger_type: triggerNode?.nodeType || "manual",
-        trigger_config: triggerNode?.config || {},
+        trigger_config: triggerConfig,
         ai_action_type: aiNode?.nodeType || "none",
-        ai_config: aiNode?.config || {},
+        ai_config: JSON.parse(JSON.stringify(aiNode?.config || {})),
         output_action_type: actionNode?.nodeType || "none",
-        output_config: actionNode?.config || {},
+        output_config: JSON.parse(JSON.stringify(actionNode?.config || {})),
         conditions: JSON.parse(JSON.stringify(workflow.conditions)),
         is_active: workflow.isActive,
       };
@@ -397,7 +423,11 @@ export const WorkflowBuilder = () => {
 
         if (error) throw error;
 
-        const updatedWorkflow = { ...workflow, id: data.id, isSaved: true };
+        const webhookUrl = triggerNode?.nodeType === 'webhook' 
+          ? `https://zyediimmjjssdbfekaiu.supabase.co/functions/v1/webhook-trigger/${data.id}`
+          : undefined;
+
+        const updatedWorkflow = { ...workflow, id: data.id, isSaved: true, webhookUrl };
         setWorkflows(workflows.map(w => w.id === workflow.id ? updatedWorkflow : w));
         if (selectedWorkflow?.id === workflow.id) {
           setSelectedWorkflow(updatedWorkflow);
@@ -651,7 +681,7 @@ export const WorkflowBuilder = () => {
         return (
           <div className="space-y-4">
             <div>
-              <Label>Time</Label>
+              <Label>Time (UTC)</Label>
               <Input
                 type="time"
                 value={node.config.time || "09:00"}
@@ -668,12 +698,99 @@ export const WorkflowBuilder = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="hourly">Hourly</SelectItem>
                   <SelectItem value="daily">Daily</SelectItem>
                   <SelectItem value="weekly">Weekly</SelectItem>
                   <SelectItem value="monthly">Monthly</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {node.config.frequency === "weekly" && (
+              <div>
+                <Label>Day of Week</Label>
+                <Select
+                  value={node.config.dayOfWeek || "1"}
+                  onValueChange={(value) => setSelectedNodeForConfig({ ...node, config: { ...node.config, dayOfWeek: value } })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Sunday</SelectItem>
+                    <SelectItem value="1">Monday</SelectItem>
+                    <SelectItem value="2">Tuesday</SelectItem>
+                    <SelectItem value="3">Wednesday</SelectItem>
+                    <SelectItem value="4">Thursday</SelectItem>
+                    <SelectItem value="5">Friday</SelectItem>
+                    <SelectItem value="6">Saturday</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {node.config.frequency === "monthly" && (
+              <div>
+                <Label>Day of Month</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={node.config.dayOfMonth || "1"}
+                  onChange={(e) => setSelectedNodeForConfig({ ...node, config: { ...node.config, dayOfMonth: e.target.value } })}
+                />
+              </div>
+            )}
+            <div>
+              <Label>Cron Expression (optional, overrides above)</Label>
+              <Input
+                placeholder="* * * * * (minute hour day month weekday)"
+                value={node.config.cron || ""}
+                onChange={(e) => setSelectedNodeForConfig({ ...node, config: { ...node.config, cron: e.target.value } })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Advanced: Use cron format for precise scheduling
+              </p>
+            </div>
+          </div>
+        );
+      case "webhook":
+        return (
+          <div className="space-y-4">
+            {selectedWorkflow?.webhookUrl && (
+              <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                <Label className="text-xs text-muted-foreground">Webhook URL</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <code className="flex-1 text-xs bg-background p-2 rounded overflow-x-auto">
+                    {selectedWorkflow.webhookUrl}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedWorkflow.webhookUrl || "");
+                      toast.success("Webhook URL copied!");
+                    }}
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+            )}
+            <div>
+              <Label>Webhook Secret (optional)</Label>
+              <Input
+                placeholder="my-secret-key"
+                value={node.config.webhookSecret || ""}
+                onChange={(e) => setSelectedNodeForConfig({ ...node, config: { ...node.config, webhookSecret: e.target.value } })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Pass via x-webhook-secret header or ?secret= query param
+              </p>
+            </div>
+            {!selectedWorkflow?.webhookUrl && (
+              <p className="text-sm text-amber-500">
+                Save the workflow to generate your webhook URL
+              </p>
+            )}
           </div>
         );
       case "ai_summarize":
