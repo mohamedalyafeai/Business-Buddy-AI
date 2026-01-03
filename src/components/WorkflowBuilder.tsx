@@ -4,7 +4,7 @@ import {
   Plus, Trash2, Play, Mail, FileText, Calendar, CheckSquare, 
   MessageSquare, Zap, ArrowRight, Settings, Loader2, Bot,
   Clock, Filter, Send, Database, Webhook, Save, RefreshCw,
-  GitBranch, History, CheckCircle, XCircle, AlertCircle
+  GitBranch, History, CheckCircle, XCircle, AlertCircle, RotateCcw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -102,6 +102,21 @@ interface WorkflowExecution {
   results: unknown[];
   error: string | null;
   context: Record<string, unknown>;
+}
+
+interface WorkflowVersion {
+  id: string;
+  workflow_id: string;
+  version_number: number;
+  name: string;
+  trigger_type: string;
+  trigger_config: Record<string, unknown>;
+  ai_action_type: string;
+  ai_config: Record<string, unknown>;
+  output_action_type: string;
+  output_config: Record<string, unknown>;
+  conditions: Condition[];
+  created_at: string;
 }
 
 const nodeTypes = {
@@ -264,10 +279,12 @@ export const WorkflowBuilder = () => {
   const [savingWorkflow, setSavingWorkflow] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
+  const [versions, setVersions] = useState<WorkflowVersion[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [conditionDialogOpen, setConditionDialogOpen] = useState(false);
   const [editingCondition, setEditingCondition] = useState<Condition | null>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [restoringVersion, setRestoringVersion] = useState<string | null>(null);
 
   // Load workflows from database
   useEffect(() => {
@@ -309,8 +326,77 @@ export const WorkflowBuilder = () => {
 
       if (error) throw error;
       setExecutions(data as WorkflowExecution[]);
+      
+      // Also load versions
+      loadVersionHistory(workflowId);
     } catch (error) {
       console.error('Error loading execution history:', error);
+    }
+  };
+
+  const loadVersionHistory = async (workflowId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('workflow_versions')
+        .select('*')
+        .eq('workflow_id', workflowId)
+        .order('version_number', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      setVersions(data as unknown as WorkflowVersion[]);
+    } catch (error) {
+      console.error('Error loading version history:', error);
+    }
+  };
+
+  const restoreVersion = async (version: WorkflowVersion) => {
+    if (!selectedWorkflow || !user) return;
+    
+    setRestoringVersion(version.id);
+
+    try {
+      // Update the workflow with the version's data
+      const { error } = await supabase
+        .from('workflows')
+        .update({
+          name: version.name,
+          trigger_type: version.trigger_type,
+          trigger_config: JSON.parse(JSON.stringify(version.trigger_config)),
+          ai_action_type: version.ai_action_type,
+          ai_config: JSON.parse(JSON.stringify(version.ai_config)),
+          output_action_type: version.output_action_type,
+          output_config: JSON.parse(JSON.stringify(version.output_config)),
+          conditions: JSON.parse(JSON.stringify(version.conditions)),
+        })
+        .eq('id', selectedWorkflow.id);
+
+      if (error) throw error;
+
+      // Reload workflows to get the updated data
+      await loadWorkflows();
+      
+      // Find and select the updated workflow
+      const { data: updatedWorkflow } = await supabase
+        .from('workflows')
+        .select('*')
+        .eq('id', selectedWorkflow.id)
+        .single();
+
+      if (updatedWorkflow) {
+        const uiWorkflow = dbToUiWorkflow(updatedWorkflow as unknown as DbWorkflow);
+        setSelectedWorkflow(uiWorkflow);
+      }
+
+      toast.success(`Restored to version ${version.version_number}`);
+      
+      // Reload version history
+      loadVersionHistory(selectedWorkflow.id);
+    } catch (error) {
+      console.error('Error restoring version:', error);
+      toast.error('Failed to restore version');
+    } finally {
+      setRestoringVersion(null);
     }
   };
 
@@ -1053,6 +1139,10 @@ export const WorkflowBuilder = () => {
                   <History className="w-4 h-4" />
                   History
                 </TabsTrigger>
+                <TabsTrigger value="versions" className="flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4" />
+                  Versions
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="editor">
@@ -1312,6 +1402,98 @@ export const WorkflowBuilder = () => {
                                 Sentiment: {String(execution.context.sentiment)}
                               </Badge>
                             )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="versions">
+                <Card className="bg-card border-border">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <RotateCcw className="w-5 h-5" />
+                      Version History
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      View and restore previous versions of this workflow. Versions are automatically saved when you update the workflow.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {!selectedWorkflow.isSaved ? (
+                      <div className="text-center py-8">
+                        <Save className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">Save your workflow first</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Version history is available after saving
+                        </p>
+                      </div>
+                    ) : versions.length === 0 ? (
+                      <div className="text-center py-8">
+                        <RotateCcw className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">No versions yet</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Versions are created automatically when you update this workflow
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {versions.map((version) => (
+                          <div
+                            key={version.id}
+                            className="p-4 rounded-lg border border-border bg-background/50 hover:border-primary/30 transition-colors"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="font-medium text-primary">v{version.version_number}</span>
+                                </div>
+                                <div>
+                                  <p className="font-medium">{version.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {format(new Date(version.created_at), "MMM d, yyyy HH:mm")}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="text-right text-sm text-muted-foreground">
+                                  <p>Trigger: {version.trigger_type}</p>
+                                  <p>AI: {version.ai_action_type}</p>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => restoreVersion(version)}
+                                  disabled={restoringVersion === version.id}
+                                >
+                                  {restoringVersion === version.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <RotateCcw className="w-4 h-4 mr-2" />
+                                      Restore
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="mt-3 flex gap-2">
+                              <Badge variant="secondary" className="text-xs">
+                                {version.trigger_type}
+                              </Badge>
+                              {version.ai_action_type !== "none" && (
+                                <Badge variant="outline" className="text-xs">
+                                  {version.ai_action_type}
+                                </Badge>
+                              )}
+                              {version.output_action_type !== "none" && (
+                                <Badge variant="outline" className="text-xs">
+                                  {version.output_action_type}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

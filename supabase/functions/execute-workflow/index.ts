@@ -7,6 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface WorkflowVariable {
+  key: string;
+  value: string;
+  description?: string;
+}
+
 interface WorkflowNode {
   id: string;
   type: "trigger" | "action" | "ai" | "condition";
@@ -31,7 +37,53 @@ interface WorkflowRequest {
   conditions?: Condition[];
   triggerData?: Record<string, unknown>;
   userId?: string;
+  variables?: WorkflowVariable[];
 }
+
+// Interpolate variables in a string - replaces {{variable_name}} with actual values
+const interpolateVariables = (
+  text: string, 
+  variables: WorkflowVariable[], 
+  context: Record<string, unknown>
+): string => {
+  if (!text) return text;
+  
+  let result = text;
+  
+  // Replace {{variable_name}} with variable values
+  for (const variable of variables) {
+    const pattern = new RegExp(`\\{\\{\\s*${variable.key}\\s*\\}\\}`, 'gi');
+    result = result.replace(pattern, variable.value);
+  }
+  
+  // Replace {{context.property}} with context values
+  result = result.replace(/\{\{\s*context\.(\w+)\s*\}\}/gi, (_, key) => {
+    return String(context[key] || '');
+  });
+  
+  // Replace {{lastOutput}} with last output
+  result = result.replace(/\{\{\s*lastOutput\s*\}\}/gi, String(context.lastOutput || ''));
+  
+  // Replace {{lastAiOutput}} with last AI output
+  result = result.replace(/\{\{\s*lastAiOutput\s*\}\}/gi, String(context.lastAiOutput || ''));
+  
+  // Replace {{triggerData.property}} with trigger data values
+  const triggerData = context.triggerData as Record<string, unknown> || {};
+  result = result.replace(/\{\{\s*triggerData\.(\w+)\s*\}\}/gi, (_, key) => {
+    return String(triggerData[key] || '');
+  });
+  
+  // Replace {{date}} with current date
+  result = result.replace(/\{\{\s*date\s*\}\}/gi, new Date().toLocaleDateString());
+  
+  // Replace {{time}} with current time
+  result = result.replace(/\{\{\s*time\s*\}\}/gi, new Date().toLocaleTimeString());
+  
+  // Replace {{datetime}} with current datetime
+  result = result.replace(/\{\{\s*datetime\s*\}\}/gi, new Date().toISOString());
+  
+  return result;
+};
 
 const evaluateCondition = (condition: Condition, context: Record<string, unknown>): boolean => {
   const fieldValue = String(context[condition.field] || context.lastAiOutput || context.lastOutput || "");
@@ -88,10 +140,10 @@ serve(async (req) => {
   let executionId: string | null = null;
 
   try {
-    const { workflowId, workflowName, nodes, conditions, triggerData, userId } = await req.json() as WorkflowRequest;
+    const { workflowId, workflowName, nodes, conditions, triggerData, userId, variables = [] } = await req.json() as WorkflowRequest;
     
     console.log(`Executing workflow: ${workflowName} (${workflowId})`);
-    console.log(`Nodes: ${nodes.length}, Conditions: ${conditions?.length || 0}`);
+    console.log(`Nodes: ${nodes.length}, Conditions: ${conditions?.length || 0}, Variables: ${variables.length}`);
 
     // Create execution record
     if (userId) {
@@ -186,7 +238,11 @@ serve(async (req) => {
               ai_respond: "You are a helpful assistant. Generate appropriate responses based on the given context.",
             };
 
-            const userPrompt = node.config.prompt || context.lastOutput || "Analyze the following context and provide insights.";
+            // Apply variable interpolation to the prompt
+            const rawPrompt = node.config.prompt || context.lastOutput || "Analyze the following context and provide insights.";
+            const userPrompt = interpolateVariables(String(rawPrompt), variables, context);
+            
+            console.log(`AI prompt after interpolation: ${userPrompt.substring(0, 100)}...`);
 
             const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
               method: "POST",
@@ -234,9 +290,13 @@ serve(async (req) => {
 
             const resend = new Resend(RESEND_API_KEY);
             
-            const to = node.config.to || node.config.email || "test@example.com";
-            const subject = node.config.subject || `Workflow: ${workflowName}`;
-            const body = node.config.body || String(context.lastAiOutput || context.lastOutput || "Workflow executed successfully");
+            // Apply variable interpolation to email fields
+            const to = interpolateVariables(node.config.to || node.config.email || "test@example.com", variables, context);
+            const subject = interpolateVariables(node.config.subject || `Workflow: ${workflowName}`, variables, context);
+            const rawBody = node.config.body || String(context.lastAiOutput || context.lastOutput || "Workflow executed successfully");
+            const body = interpolateVariables(rawBody, variables, context);
+            
+            console.log(`Sending email to: ${to}, subject: ${subject}`);
 
             const emailResponse = await resend.emails.send({
               from: node.config.from || "Workflow <onboarding@resend.dev>",
@@ -264,7 +324,9 @@ serve(async (req) => {
 
           // Create Task Action
           case "create_task": {
-            const taskTitle = node.config.title || String(context.lastAiOutput || "New Task from Workflow");
+            // Apply variable interpolation to task title
+            const rawTitle = node.config.title || String(context.lastAiOutput || "New Task from Workflow");
+            const taskTitle = interpolateVariables(rawTitle, variables, context);
             const task = {
               title: taskTitle,
               priority: node.config.priority || "medium",
@@ -291,8 +353,9 @@ serve(async (req) => {
 
           // Calendar Event Action
           case "calendar_event": {
+            // Apply variable interpolation to calendar event fields
             const event = {
-              title: node.config.title || "Workflow Event",
+              title: interpolateVariables(node.config.title || "Workflow Event", variables, context),
               date: node.config.date || new Date().toISOString(),
               description: String(context.lastAiOutput || ""),
               workflowId,
