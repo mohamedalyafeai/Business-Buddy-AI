@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageSquare, Calendar, TrendingUp, Clock, Loader2, Trash2, Download, FileJson, FileText, Zap, Sparkles } from "lucide-react";
+import { MessageSquare, Calendar, TrendingUp, Clock, Loader2, Trash2, Download, FileJson, FileText, Zap, Sparkles, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,9 @@ import { useChatNotifications } from "@/hooks/useChatNotifications";
 import { exportAsJSON, exportAsPDF } from "@/lib/exportChat";
 import { ProductivityInsights } from "@/components/ProductivityInsights";
 import { WorkflowBuilder } from "@/components/WorkflowBuilder";
+import { AdminUserManagement } from "@/components/admin/AdminUserManagement";
+import { AdminWorkflowAnalytics } from "@/components/admin/AdminWorkflowAnalytics";
+import { AdminSystemSettings } from "@/components/admin/AdminSystemSettings";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +41,7 @@ interface Analytics {
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdminRole();
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [analytics, setAnalytics] = useState<Analytics>({
@@ -182,7 +187,7 @@ const Dashboard = () => {
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading || loading || adminLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -197,7 +202,7 @@ const Dashboard = () => {
         <h1 className="text-3xl font-bold text-foreground mb-8">Dashboard</h1>
 
         <Tabs defaultValue="overview" className="space-y-8">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className={`grid w-full ${isAdmin ? 'max-w-2xl grid-cols-4' : 'max-w-md grid-cols-3'}`}>
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
               Overview
@@ -210,6 +215,12 @@ const Dashboard = () => {
               <Zap className="w-4 h-4" />
               Workflows
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="admin" className="flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Admin
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Overview Tab */}
@@ -365,6 +376,36 @@ const Dashboard = () => {
           <TabsContent value="workflows">
             <WorkflowBuilder />
           </TabsContent>
+
+          {/* Admin Tab - Only visible to admins */}
+          {isAdmin && (
+            <TabsContent value="admin" className="space-y-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Shield className="h-6 w-6 text-primary" />
+                <h2 className="text-2xl font-bold text-foreground">Admin Panel</h2>
+              </div>
+              
+              <Tabs defaultValue="users" className="space-y-6">
+                <TabsList className="grid w-full max-w-md grid-cols-3">
+                  <TabsTrigger value="users">Users</TabsTrigger>
+                  <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                  <TabsTrigger value="settings">Settings</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="users">
+                  <AdminUserManagement />
+                </TabsContent>
+                
+                <TabsContent value="analytics">
+                  <AdminWorkflowAnalytics />
+                </TabsContent>
+                
+                <TabsContent value="settings">
+                  <AdminSystemSettings />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
