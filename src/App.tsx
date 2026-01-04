@@ -7,7 +7,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { WorkAssistantWidget } from "@/components/WorkAssistantWidget";
 import { FloatingWidget } from "@/components/FloatingWidget";
 import { PageTransition } from "@/components/PageTransition";
-import { ScrollToTop } from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -42,7 +41,6 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <ScrollToTop />
           <AnimatedRoutes />
           <WorkAssistantWidget />
           <FloatingWidget />
