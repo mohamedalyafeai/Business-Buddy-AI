@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Settings, Bell, Shield, Database, Mail, Save } from "lucide-react";
+import { createAuditLog } from "@/lib/auditLog";
 
 export const AdminSystemSettings = () => {
   const [settings, setSettings] = useState({
@@ -22,6 +23,18 @@ export const AdminSystemSettings = () => {
     setSaving(true);
     // Simulate save - in production, this would save to database
     await new Promise((resolve) => setTimeout(resolve, 1000));
+    
+    // Log settings update
+    await createAuditLog({
+      action: "settings_updated",
+      entity_type: "system_settings",
+      details: {
+        maintenance_mode: settings.maintenanceMode ? "enabled" : "disabled",
+        signups: settings.allowNewSignups ? "enabled" : "disabled",
+        email_notifications: settings.emailNotifications ? "enabled" : "disabled",
+      },
+    });
+
     toast.success("Settings saved successfully");
     setSaving(false);
   };

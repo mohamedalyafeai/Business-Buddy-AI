@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Users, Shield, Trash2, Loader2, UserPlus, Search } from "lucide-react";
 import { format } from "date-fns";
+import { createAuditLog } from "@/lib/auditLog";
 
 interface UserWithRole {
   id: string;
@@ -75,9 +76,11 @@ export const AdminUserManagement = () => {
       // First try to update existing role
       const { data: existing } = await supabase
         .from("user_roles")
-        .select("id")
+        .select("id, role")
         .eq("user_id", userId)
         .maybeSingle();
+
+      const previousRole = existing?.role || null;
 
       if (existing) {
         // Update existing
@@ -86,12 +89,28 @@ export const AdminUserManagement = () => {
           .update({ role: role as "admin" | "moderator" | "user" })
           .eq("user_id", userId);
         if (error) throw error;
+
+        // Log role update
+        await createAuditLog({
+          action: "role_updated",
+          entity_type: "user_role",
+          entity_id: userId,
+          details: { previous_role: previousRole, new_role: role },
+        });
       } else {
         // Insert new
         const { error } = await supabase
           .from("user_roles")
           .insert({ user_id: userId, role: role as "admin" | "moderator" | "user" });
         if (error) throw error;
+
+        // Log role addition
+        await createAuditLog({
+          action: "role_added",
+          entity_type: "user_role",
+          entity_id: userId,
+          details: { role },
+        });
       }
 
       setUsers((prev) =>
@@ -109,12 +128,23 @@ export const AdminUserManagement = () => {
   const handleRemoveRole = async (userId: string) => {
     setRemovingRole(userId);
     try {
+      const user = users.find((u) => u.user_id === userId);
+      const previousRole = user?.role;
+
       const { error } = await supabase
         .from("user_roles")
         .delete()
         .eq("user_id", userId);
 
       if (error) throw error;
+
+      // Log role removal
+      await createAuditLog({
+        action: "role_removed",
+        entity_type: "user_role",
+        entity_id: userId,
+        details: { previous_role: previousRole || "none" },
+      });
 
       setUsers((prev) =>
         prev.map((u) => (u.user_id === userId ? { ...u, role: null } : u))
