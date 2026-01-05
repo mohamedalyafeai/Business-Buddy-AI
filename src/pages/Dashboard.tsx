@@ -17,6 +17,7 @@ import { WorkflowBuilder } from "@/components/WorkflowBuilder";
 import { AdminUserManagement } from "@/components/admin/AdminUserManagement";
 import { AdminWorkflowAnalytics } from "@/components/admin/AdminWorkflowAnalytics";
 import { AdminSystemSettings } from "@/components/admin/AdminSystemSettings";
+import { AdminAuditLogs } from "@/components/admin/AdminAuditLogs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -386,10 +387,11 @@ const Dashboard = () => {
               </div>
               
               <Tabs defaultValue="users" className="space-y-6">
-                <TabsList className="grid w-full max-w-md grid-cols-3">
+                <TabsList className="grid w-full max-w-lg grid-cols-4">
                   <TabsTrigger value="users">Users</TabsTrigger>
                   <TabsTrigger value="analytics">Analytics</TabsTrigger>
                   <TabsTrigger value="settings">Settings</TabsTrigger>
+                  <TabsTrigger value="audit">Audit Logs</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="users">
@@ -402,6 +404,10 @@ const Dashboard = () => {
                 
                 <TabsContent value="settings">
                   <AdminSystemSettings />
+                </TabsContent>
+
+                <TabsContent value="audit">
+                  <AdminAuditLogs />
                 </TabsContent>
               </Tabs>
             </TabsContent>
