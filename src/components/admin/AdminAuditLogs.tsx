@@ -93,8 +93,8 @@ export const AdminAuditLogs = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Filters */}
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+            <div className="relative flex-1 max-w-full sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search logs..."
@@ -104,7 +104,7 @@ export const AdminAuditLogs = () => {
               />
             </div>
             <Select value={filterAction} onValueChange={setFilterAction}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder="Filter by action" />
               </SelectTrigger>
               <SelectContent>
@@ -119,42 +119,42 @@ export const AdminAuditLogs = () => {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold text-foreground">{logs.length}</div>
-              <div className="text-sm text-muted-foreground">Total Logs</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="p-3 sm:p-4 rounded-lg bg-muted/50">
+              <div className="text-xl sm:text-2xl font-bold text-foreground">{logs.length}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Total Logs</div>
             </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold text-foreground">
+            <div className="p-3 sm:p-4 rounded-lg bg-muted/50">
+              <div className="text-xl sm:text-2xl font-bold text-foreground">
                 {logs.filter((l) => l.action.includes("role")).length}
               </div>
-              <div className="text-sm text-muted-foreground">Role Changes</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Role Changes</div>
             </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold text-foreground">
+            <div className="p-3 sm:p-4 rounded-lg bg-muted/50">
+              <div className="text-xl sm:text-2xl font-bold text-foreground">
                 {logs.filter((l) => l.action.includes("settings")).length}
               </div>
-              <div className="text-sm text-muted-foreground">Settings Updates</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Settings</div>
             </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold text-foreground">
+            <div className="p-3 sm:p-4 rounded-lg bg-muted/50">
+              <div className="text-xl sm:text-2xl font-bold text-foreground">
                 {logs.filter((l) => {
                   const date = new Date(l.created_at);
                   const today = new Date();
                   return date.toDateString() === today.toDateString();
                 }).length}
               </div>
-              <div className="text-sm text-muted-foreground">Today</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Today</div>
             </div>
           </div>
 
           {/* Log List */}
           <div className="space-y-3">
             {filteredLogs.length === 0 ? (
-              <div className="text-center py-12">
-                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <div className="text-center py-8 sm:py-12">
+                <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No audit logs found</p>
-                <p className="text-sm text-muted-foreground mt-2">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-2">
                   Admin actions will appear here once performed
                 </p>
               </div>
@@ -162,25 +162,25 @@ export const AdminAuditLogs = () => {
               filteredLogs.map((log) => (
                 <div
                   key={log.id}
-                  className="flex items-start justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-start justify-between p-3 sm:p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors gap-2 sm:gap-4"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                       {getActionIcon(log.action)}
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-foreground text-sm sm:text-base">
                           {log.action.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
                         </span>
-                        <Badge variant={getActionBadgeVariant(log.action)}>
+                        <Badge variant={getActionBadgeVariant(log.action)} className="text-xs">
                           {log.entity_type}
                         </Badge>
                       </div>
                       {log.details && Object.keys(log.details).length > 0 && (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs sm:text-sm text-muted-foreground flex flex-wrap gap-x-3">
                           {Object.entries(log.details).map(([key, value]) => (
-                            <span key={key} className="mr-3">
+                            <span key={key}>
                               <span className="text-foreground/70">{key}:</span>{" "}
                               {String(value)}
                             </span>
@@ -188,13 +188,13 @@ export const AdminAuditLogs = () => {
                         </div>
                       )}
                       {log.entity_id && (
-                        <div className="text-xs text-muted-foreground font-mono">
+                        <div className="text-xs text-muted-foreground font-mono truncate">
                           ID: {log.entity_id}
                         </div>
                       )}
                     </div>
                   </div>
-                  <div className="text-sm text-muted-foreground whitespace-nowrap">
+                  <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap pl-11 sm:pl-0">
                     {format(new Date(log.created_at), "MMM d, h:mm a")}
                   </div>
                 </div>
