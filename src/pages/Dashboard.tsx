@@ -199,86 +199,89 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="container mx-auto px-4 pt-32 pb-16">
-        <h1 className="text-3xl font-bold text-foreground mb-8">Dashboard</h1>
+      <div className="container mx-auto px-4 pt-24 sm:pt-32 pb-8 sm:pb-16">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6 sm:mb-8">Dashboard</h1>
 
-        <Tabs defaultValue="overview" className="space-y-8">
-          <TabsList className={`grid w-full ${isAdmin ? 'max-w-2xl grid-cols-4' : 'max-w-md grid-cols-3'}`}>
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Overview
+        <Tabs defaultValue="overview" className="space-y-6 sm:space-y-8">
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-2 sm:grid-cols-4 max-w-2xl' : 'grid-cols-3 max-w-md'} h-auto`}>
+            <TabsTrigger value="overview" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
+              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">Overview</span>
+              <span className="xs:hidden">Stats</span>
             </TabsTrigger>
-            <TabsTrigger value="insights" className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              AI Insights
+            <TabsTrigger value="insights" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
+              <Sparkles className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">AI Insights</span>
+              <span className="sm:hidden">AI</span>
             </TabsTrigger>
-            <TabsTrigger value="workflows" className="flex items-center gap-2">
-              <Zap className="w-4 h-4" />
-              Workflows
+            <TabsTrigger value="workflows" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
+              <Zap className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Workflows</span>
+              <span className="sm:hidden">Tasks</span>
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="admin" className="flex items-center gap-2">
-                <Shield className="w-4 h-4" />
+              <TabsTrigger value="admin" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
+                <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
                 Admin
               </TabsTrigger>
             )}
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-8">
+          <TabsContent value="overview" className="space-y-6 sm:space-y-8">
             {/* Analytics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               <Card className="bg-card border-border">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Conversations
+                <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    Conversations
                   </CardTitle>
-                  <MessageSquare className="h-4 w-4 text-primary" />
+                  <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground">
+                <CardContent className="p-3 sm:p-6 pt-0">
+                  <div className="text-2xl sm:text-3xl font-bold text-foreground">
                     {analytics.totalConversations}
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-card border-border">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Messages
+                <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    Messages
                   </CardTitle>
-                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground">
+                <CardContent className="p-3 sm:p-6 pt-0">
+                  <div className="text-2xl sm:text-3xl font-bold text-foreground">
                     {analytics.totalMessages}
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-card border-border">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Conversations Today
+                <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    Today
                   </CardTitle>
-                  <Calendar className="h-4 w-4 text-primary" />
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground">
+                <CardContent className="p-3 sm:p-6 pt-0">
+                  <div className="text-2xl sm:text-3xl font-bold text-foreground">
                     {analytics.conversationsToday}
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-card border-border">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Messages This Week
+                <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                    This Week
                   </CardTitle>
-                  <Clock className="h-4 w-4 text-primary" />
+                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground">
+                <CardContent className="p-3 sm:p-6 pt-0">
+                  <div className="text-2xl sm:text-3xl font-bold text-foreground">
                     {analytics.messagesThisWeek}
                   </div>
                 </CardContent>
@@ -287,51 +290,51 @@ const Dashboard = () => {
 
             {/* Chat History */}
             <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-foreground">Chat History</CardTitle>
-                <CardDescription>Your recent conversations with AgentAI</CardDescription>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-foreground text-lg sm:text-xl">Chat History</CardTitle>
+                <CardDescription className="text-sm">Your recent conversations with AgentAI</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 {conversations.length === 0 ? (
-                  <div className="text-center py-12">
-                    <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <div className="text-center py-8 sm:py-12">
+                    <MessageSquare className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground">No conversations yet</p>
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-2">
                       Start chatting with AgentAI to see your history here
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {conversations.map((conversation) => (
                       <div
                         key={conversation.id}
-                        className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors gap-2 sm:gap-4"
                       >
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-foreground truncate">
+                          <h3 className="font-medium text-foreground truncate text-sm sm:text-base">
                             {conversation.title}
                           </h3>
-                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 text-xs sm:text-sm text-muted-foreground">
                             <span>{conversation.message_count} messages</span>
-                            <span>•</span>
+                            <span className="hidden sm:inline">•</span>
                             <span>
-                              {format(new Date(conversation.updated_at), "MMM d, yyyy h:mm a")}
+                              {format(new Date(conversation.updated_at), "MMM d, yyyy")}
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 justify-end">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-muted-foreground hover:text-primary"
+                                className="text-muted-foreground hover:text-primary h-8 w-8 sm:h-10 sm:w-10"
                                 disabled={exporting === conversation.id}
                               >
                                 {exporting === conversation.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                                 ) : (
-                                  <Download className="h-4 w-4" />
+                                  <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                                 )}
                               </Button>
                             </DropdownMenuTrigger>
@@ -349,14 +352,14 @@ const Dashboard = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-muted-foreground hover:text-destructive"
+                            className="text-muted-foreground hover:text-destructive h-8 w-8 sm:h-10 sm:w-10"
                             onClick={() => handleDeleteConversation(conversation.id)}
                             disabled={deleting === conversation.id}
                           >
                             {deleting === conversation.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                             ) : (
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                             )}
                           </Button>
                         </div>
@@ -380,18 +383,18 @@ const Dashboard = () => {
 
           {/* Admin Tab - Only visible to admins */}
           {isAdmin && (
-            <TabsContent value="admin" className="space-y-8">
+            <TabsContent value="admin" className="space-y-6 sm:space-y-8">
               <div className="flex items-center gap-2 mb-4">
-                <Shield className="h-6 w-6 text-primary" />
-                <h2 className="text-2xl font-bold text-foreground">Admin Panel</h2>
+                <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground">Admin Panel</h2>
               </div>
               
-              <Tabs defaultValue="users" className="space-y-6">
-                <TabsList className="grid w-full max-w-lg grid-cols-4">
-                  <TabsTrigger value="users">Users</TabsTrigger>
-                  <TabsTrigger value="analytics">Analytics</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
-                  <TabsTrigger value="audit">Audit Logs</TabsTrigger>
+              <Tabs defaultValue="users" className="space-y-4 sm:space-y-6">
+                <TabsList className="grid w-full max-w-lg grid-cols-2 sm:grid-cols-4 h-auto">
+                  <TabsTrigger value="users" className="text-xs sm:text-sm py-2">Users</TabsTrigger>
+                  <TabsTrigger value="analytics" className="text-xs sm:text-sm py-2">Analytics</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-xs sm:text-sm py-2">Settings</TabsTrigger>
+                  <TabsTrigger value="audit" className="text-xs sm:text-sm py-2">Audit</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="users">
