@@ -2,13 +2,15 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Sparkles, LogOut, User, LayoutDashboard } from "lucide-react";
+import { Menu, X, Sparkles, LogOut, User, LayoutDashboard, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
 const navLinks = [
@@ -75,6 +77,7 @@ export const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Quick Actions</DropdownMenuLabel>
                   <DropdownMenuItem onClick={() => navigate("/dashboard")}>
                     <LayoutDashboard className="w-4 h-4 mr-2" />
                     Dashboard
@@ -83,6 +86,11 @@ export const Navbar = () => {
                     <User className="w-4 h-4 mr-2" />
                     Profile
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/profile")}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out
@@ -148,7 +156,11 @@ export const Navbar = () => {
                       <User className="w-4 h-4 mr-2" />
                       Profile
                     </Button>
-                    <Button variant="ghost" onClick={handleSignOut}>
+                    <Button variant="ghost" onClick={() => { navigate("/profile"); setIsOpen(false); }}>
+                      <Settings className="w-4 h-4 mr-2" />
+                      Settings
+                    </Button>
+                    <Button variant="ghost" onClick={handleSignOut} className="text-destructive">
                       <LogOut className="w-4 h-4 mr-2" />
                       Sign Out
                     </Button>
