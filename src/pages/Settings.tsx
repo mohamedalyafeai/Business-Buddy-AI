@@ -14,14 +14,21 @@ import {
   ChevronRight,
   Mail,
   MessageSquare,
-  Smartphone
+  Smartphone,
+  KeyRound,
+  Loader2,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
 import {
@@ -43,6 +50,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -55,11 +70,123 @@ const Settings = () => {
   const [workflowAlerts, setWorkflowAlerts] = useState(true);
   const [weeklyDigest, setWeeklyDigest] = useState(true);
 
+  // 2FA state
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(true);
+  const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [unenrollDialogOpen, setUnenrollDialogOpen] = useState(false);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [factorId, setFactorId] = useState<string | null>(null);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [enrolling, setEnrolling] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [unenrolling, setUnenrolling] = useState(false);
+
   useEffect(() => {
     if (!user) {
       navigate("/auth");
+    } else {
+      checkMfaStatus();
     }
   }, [user, navigate]);
+
+  const checkMfaStatus = async () => {
+    try {
+      setMfaLoading(true);
+      const { data, error } = await supabase.auth.mfa.listFactors();
+      if (error) throw error;
+      
+      const verifiedFactors = data.totp.filter(f => f.status === 'verified');
+      setMfaEnabled(verifiedFactors.length > 0);
+      if (verifiedFactors.length > 0) {
+        setFactorId(verifiedFactors[0].id);
+      }
+    } catch (error) {
+      console.error("Error checking MFA status:", error);
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleEnrollMfa = async () => {
+    try {
+      setEnrolling(true);
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: 'totp',
+        friendlyName: 'Authenticator App'
+      });
+      
+      if (error) throw error;
+      
+      setQrCode(data.totp.qr_code);
+      setSecret(data.totp.secret);
+      setFactorId(data.id);
+      setEnrollDialogOpen(true);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to start 2FA enrollment");
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  const handleVerifyEnrollment = async () => {
+    if (!factorId || verifyCode.length !== 6) {
+      toast.error("Please enter a valid 6-digit code");
+      return;
+    }
+
+    try {
+      setVerifying(true);
+      
+      // Create a challenge
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId
+      });
+      
+      if (challengeError) throw challengeError;
+      
+      // Verify the code
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challengeData.id,
+        code: verifyCode
+      });
+      
+      if (verifyError) throw verifyError;
+      
+      setMfaEnabled(true);
+      setEnrollDialogOpen(false);
+      setVerifyCode("");
+      setQrCode(null);
+      setSecret(null);
+      toast.success("Two-factor authentication enabled successfully!");
+    } catch (error: any) {
+      toast.error(error.message || "Invalid verification code");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleUnenrollMfa = async () => {
+    if (!factorId) return;
+
+    try {
+      setUnenrolling(true);
+      const { error } = await supabase.auth.mfa.unenroll({ factorId });
+      
+      if (error) throw error;
+      
+      setMfaEnabled(false);
+      setFactorId(null);
+      setUnenrollDialogOpen(false);
+      toast.success("Two-factor authentication disabled");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to disable 2FA");
+    } finally {
+      setUnenrolling(false);
+    }
+  };
 
   if (!user) {
     return null;
@@ -142,6 +269,73 @@ const Settings = () => {
           </h1>
 
           <div className="space-y-6">
+            {/* Security Section - 2FA */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Security
+                </CardTitle>
+                <CardDescription>
+                  Protect your account with additional security measures
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <KeyRound className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">Two-Factor Authentication</p>
+                        {mfaLoading ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        ) : mfaEnabled ? (
+                          <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Enabled
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Disabled
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Add an extra layer of security using an authenticator app
+                      </p>
+                    </div>
+                  </div>
+                  {mfaEnabled ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setUnenrollDialogOpen(true)}
+                      disabled={mfaLoading}
+                    >
+                      Disable 2FA
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      onClick={handleEnrollMfa}
+                      disabled={mfaLoading || enrolling}
+                    >
+                      {enrolling ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Setting up...
+                        </>
+                      ) : (
+                        "Enable 2FA"
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Notifications Section */}
             <Card>
               <CardHeader>
@@ -366,6 +560,107 @@ const Settings = () => {
           </div>
         </div>
       </div>
+
+      {/* 2FA Enrollment Dialog */}
+      <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-primary" />
+              Set Up Two-Factor Authentication
+            </DialogTitle>
+            <DialogDescription>
+              Scan the QR code with your authenticator app (like Google Authenticator or Authy), then enter the 6-digit code to verify.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {qrCode && (
+              <div className="flex flex-col items-center gap-4">
+                <div className="bg-white p-4 rounded-lg">
+                  <img src={qrCode} alt="2FA QR Code" className="w-48 h-48" />
+                </div>
+                {secret && (
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Can't scan? Enter this code manually:</p>
+                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all">
+                      {secret}
+                    </code>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="verify-code">Verification Code</Label>
+              <Input
+                id="verify-code"
+                placeholder="000000"
+                value={verifyCode}
+                onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                maxLength={6}
+                className="text-center text-lg tracking-widest font-mono"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setEnrollDialogOpen(false);
+                setVerifyCode("");
+                setQrCode(null);
+                setSecret(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleVerifyEnrollment}
+              disabled={verifyCode.length !== 6 || verifying}
+            >
+              {verifying ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                "Verify & Enable"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Disable 2FA Confirmation Dialog */}
+      <AlertDialog open={unenrollDialogOpen} onOpenChange={setUnenrollDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Two-Factor Authentication?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the extra security layer from your account. You can always enable it again later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unenrolling}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnenrollMfa}
+              disabled={unenrolling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {unenrolling ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Disabling...
+                </>
+              ) : (
+                "Disable 2FA"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
