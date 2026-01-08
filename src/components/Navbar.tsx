@@ -86,7 +86,7 @@ export const Navbar = () => {
                     <User className="w-4 h-4 mr-2" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/profile")}>
+                  <DropdownMenuItem onClick={() => navigate("/settings")}>
                     <Settings className="w-4 h-4 mr-2" />
                     Settings
                   </DropdownMenuItem>
@@ -156,7 +156,7 @@ export const Navbar = () => {
                       <User className="w-4 h-4 mr-2" />
                       Profile
                     </Button>
-                    <Button variant="ghost" onClick={() => { navigate("/profile"); setIsOpen(false); }}>
+                    <Button variant="ghost" onClick={() => { navigate("/settings"); setIsOpen(false); }}>
                       <Settings className="w-4 h-4 mr-2" />
                       Settings
                     </Button>
