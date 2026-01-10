@@ -4,7 +4,8 @@ import {
   Plus, Trash2, Play, Mail, FileText, Calendar, CheckSquare, 
   MessageSquare, Zap, ArrowRight, Settings, Loader2, Bot,
   Clock, Filter, Send, Database, Webhook, Save, RefreshCw,
-  GitBranch, History, CheckCircle, XCircle, AlertCircle, RotateCcw
+  GitBranch, History, CheckCircle, XCircle, AlertCircle, RotateCcw,
+  Download, Upload
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -798,6 +799,137 @@ export const WorkflowBuilder = () => {
     toast.success("Workflow deleted");
   };
 
+  // Export workflow as JSON
+  const exportWorkflow = (workflow: Workflow) => {
+    const exportData = {
+      name: workflow.name,
+      nodes: workflow.nodes.map(({ id, ...rest }) => rest),
+      conditions: workflow.conditions.map(({ id, ...rest }) => rest),
+      variables: workflow.variables,
+      exportedAt: new Date().toISOString(),
+      version: "1.0"
+    };
+    
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `workflow-${workflow.name.replace(/\s+/g, "-").toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Workflow exported successfully");
+  };
+
+  // Export all workflows as JSON
+  const exportAllWorkflows = () => {
+    const exportData = {
+      workflows: workflows.map(workflow => ({
+        name: workflow.name,
+        nodes: workflow.nodes.map(({ id, ...rest }) => rest),
+        conditions: workflow.conditions.map(({ id, ...rest }) => rest),
+        variables: workflow.variables,
+      })),
+      exportedAt: new Date().toISOString(),
+      version: "1.0"
+    };
+    
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `all-workflows-${format(new Date(), "yyyy-MM-dd")}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${workflows.length} workflows`);
+  };
+
+  // Import workflow from JSON
+  const importWorkflow = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      // Check if it's a single workflow or multiple workflows
+      if (data.workflows && Array.isArray(data.workflows)) {
+        // Import multiple workflows
+        let imported = 0;
+        for (const workflowData of data.workflows) {
+          await importSingleWorkflow(workflowData);
+          imported++;
+        }
+        toast.success(`Imported ${imported} workflows`);
+      } else if (data.name && data.nodes) {
+        // Import single workflow
+        await importSingleWorkflow(data);
+        toast.success("Workflow imported successfully");
+      } else {
+        throw new Error("Invalid workflow format");
+      }
+      
+      // Reload workflows
+      await loadWorkflows();
+    } catch (error) {
+      console.error("Error importing workflow:", error);
+      toast.error("Failed to import workflow. Please check the file format.");
+    }
+    
+    // Reset file input
+    event.target.value = "";
+  };
+
+  const importSingleWorkflow = async (data: {
+    name: string;
+    nodes: Omit<WorkflowNode, "id">[];
+    conditions: Omit<Condition, "id">[];
+    variables?: WorkflowVariable[];
+  }) => {
+    if (!user) return;
+    
+    const workflowId = crypto.randomUUID();
+    
+    // Parse nodes to extract workflow configuration
+    const triggerNode = data.nodes.find(n => n.type === "trigger");
+    const aiNode = data.nodes.find(n => n.type === "ai");
+    const actionNode = data.nodes.find(n => n.type === "action");
+    
+    const conditionsData = data.conditions.map(c => ({
+      ...c,
+      id: crypto.randomUUID(),
+    }));
+
+    try {
+      const workflowData = {
+        id: workflowId,
+        user_id: user.id,
+        name: `${data.name} (Imported)`,
+        trigger_type: triggerNode?.nodeType || "schedule",
+        trigger_config: JSON.parse(JSON.stringify({ ...triggerNode?.config, variables: data.variables || [] })),
+        ai_action_type: aiNode?.nodeType || "none",
+        ai_config: JSON.parse(JSON.stringify(aiNode?.config || {})),
+        output_action_type: actionNode?.nodeType || "none",
+        output_config: JSON.parse(JSON.stringify(actionNode?.config || {})),
+        conditions: JSON.parse(JSON.stringify(conditionsData)),
+        is_active: false,
+      };
+      
+      const { error } = await supabase.from('workflows').insert(workflowData);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error saving imported workflow:", error);
+      throw error;
+    }
+  };
+
   const getNodeIcon = (nodeType: string) => {
     const allNodes = [...nodeTypes.triggers, ...nodeTypes.actions, ...nodeTypes.ai, ...nodeTypes.conditions];
     const node = allNodes.find(n => n.id === nodeType);
@@ -1036,11 +1168,35 @@ export const WorkflowBuilder = () => {
           <Zap className="w-5 h-5 text-primary" />
           <h2 className="text-xl font-semibold text-foreground">AI Workflow Builder</h2>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={loadWorkflows}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
+          
+          {/* Import Button */}
+          <div className="relative">
+            <input
+              type="file"
+              accept=".json"
+              onChange={importWorkflow}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              title="Import workflow from JSON"
+            />
+            <Button variant="outline" size="sm">
+              <Upload className="w-4 h-4 mr-2" />
+              Import
+            </Button>
+          </div>
+          
+          {/* Export All Button */}
+          {workflows.length > 0 && (
+            <Button variant="outline" size="sm" onClick={exportAllWorkflows}>
+              <Download className="w-4 h-4 mr-2" />
+              Export All
+            </Button>
+          )}
+          
           <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
@@ -1055,7 +1211,7 @@ export const WorkflowBuilder = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 Choose a template to quickly create a pre-configured workflow
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
                 {workflowTemplates.map((template) => (
                   <button
                     key={template.id}
@@ -1167,6 +1323,17 @@ export const WorkflowBuilder = () => {
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            exportWorkflow(workflow);
+                          }}
+                          title="Export workflow"
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
