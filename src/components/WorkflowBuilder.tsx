@@ -210,6 +210,96 @@ const workflowTemplates: WorkflowTemplate[] = [
     ],
     conditions: [],
   },
+  {
+    id: "lead_qualifier",
+    name: "Lead Qualification",
+    description: "Automatically qualify leads and route to appropriate team",
+    icon: Zap,
+    nodes: [
+      { type: "trigger", nodeType: "webhook", config: {}, label: "New Lead Webhook" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this lead information. Score from 1-100 based on: company size, budget, urgency, and fit. Categorize as hot, warm, or cold." }, label: "AI Score Lead" },
+      { type: "condition", nodeType: "condition", config: {}, label: "Route by Score" },
+      { type: "action", nodeType: "create_task", config: { priority: "high", title: "Follow up with qualified lead" }, label: "Create Follow-up" },
+      { type: "action", nodeType: "send_email", config: { subject: "New Qualified Lead Alert" }, label: "Notify Sales Team" },
+    ],
+    conditions: [
+      { field: "lastAiOutput", operator: "contains", value: "hot", thenAction: "continue", elseAction: "skip" },
+    ],
+  },
+  {
+    id: "customer_feedback",
+    name: "Customer Feedback Analysis",
+    description: "Analyze feedback and trigger actions based on sentiment",
+    icon: MessageSquare,
+    nodes: [
+      { type: "trigger", nodeType: "webhook", config: {}, label: "Feedback Received" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this customer feedback. Determine sentiment (positive/negative/neutral), extract key themes, and identify any urgent issues requiring immediate attention." }, label: "Sentiment Analysis" },
+      { type: "condition", nodeType: "condition", config: {}, label: "Check Sentiment" },
+      { type: "ai", nodeType: "ai_draft", config: { prompt: "Draft a personalized thank you response acknowledging their feedback and any actions we'll take." }, label: "Draft Response" },
+      { type: "action", nodeType: "send_email", config: { subject: "Thank you for your feedback" }, label: "Send Response" },
+    ],
+    conditions: [
+      { field: "lastAiOutput", operator: "contains", value: "negative", thenAction: "escalate", elseAction: "continue" },
+    ],
+  },
+  {
+    id: "meeting_prep",
+    name: "Meeting Preparation",
+    description: "Auto-generate meeting briefs and agendas",
+    icon: Calendar,
+    nodes: [
+      { type: "trigger", nodeType: "schedule", config: { time: "07:00", frequency: "daily" }, label: "Morning Prep" },
+      { type: "ai", nodeType: "ai_summarize", config: { prompt: "Review today's scheduled meetings. For each meeting, summarize: attendees, purpose, key discussion points, and any preparation needed." }, label: "Analyze Meetings" },
+      { type: "ai", nodeType: "ai_draft", config: { prompt: "Create a concise meeting brief with agenda items, talking points, and action items from previous meetings with these attendees." }, label: "Generate Brief" },
+      { type: "action", nodeType: "send_email", config: { subject: "Your Meeting Prep for Today" }, label: "Email Brief" },
+    ],
+    conditions: [],
+  },
+  {
+    id: "content_moderation",
+    name: "Content Moderation",
+    description: "AI-powered content moderation with auto-flagging",
+    icon: Bot,
+    nodes: [
+      { type: "trigger", nodeType: "webhook", config: {}, label: "New Content" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this content for policy violations including: spam, inappropriate language, harmful content, or misinformation. Provide a risk score (1-10) and detailed reasoning." }, label: "Content Analysis" },
+      { type: "condition", nodeType: "condition", config: {}, label: "Risk Check" },
+      { type: "action", nodeType: "save_data", config: { table: "flagged_content" }, label: "Flag Content" },
+      { type: "action", nodeType: "send_email", config: { subject: "Content Flagged for Review" }, label: "Alert Moderators" },
+    ],
+    conditions: [
+      { field: "lastAiOutput", operator: "regex_match", value: "risk.*[7-9]|risk.*10", thenAction: "continue", elseAction: "approve" },
+    ],
+  },
+  {
+    id: "data_enrichment",
+    name: "Data Enrichment Pipeline",
+    description: "Enrich and clean incoming data automatically",
+    icon: Database,
+    nodes: [
+      { type: "trigger", nodeType: "webhook", config: {}, label: "Data Received" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this data entry. Validate format, check for inconsistencies, suggest corrections, and enrich with additional context where possible." }, label: "Validate & Enrich" },
+      { type: "condition", nodeType: "condition", config: {}, label: "Quality Check" },
+      { type: "action", nodeType: "save_data", config: { table: "enriched_data" }, label: "Save Enriched Data" },
+    ],
+    conditions: [
+      { field: "validation_passed", operator: "equals", value: "true", thenAction: "continue", elseAction: "flag_for_review" },
+    ],
+  },
+  {
+    id: "document_processor",
+    name: "Document Processor",
+    description: "Extract insights from documents and route accordingly",
+    icon: FileText,
+    nodes: [
+      { type: "trigger", nodeType: "webhook", config: {}, label: "Document Upload" },
+      { type: "ai", nodeType: "ai_summarize", config: { prompt: "Extract key information from this document: document type, main topics, key dates, important figures, and action items." }, label: "Extract Info" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Categorize this document and determine which department should handle it: legal, finance, HR, operations, or general." }, label: "Categorize" },
+      { type: "action", nodeType: "save_data", config: { table: "processed_documents" }, label: "Archive" },
+      { type: "action", nodeType: "create_task", config: { title: "Review processed document" }, label: "Create Review Task" },
+    ],
+    conditions: [],
+  },
 ];
 
 // Convert DB workflow to UI workflow
