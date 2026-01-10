@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Sparkles, LogOut, User, LayoutDashboard, Settings, Moon, Sun } from "lucide-react";
+import { Menu, X, Sparkles, LogOut, User, LayoutDashboard, Settings, Moon, Sun, Command } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
@@ -75,6 +75,24 @@ export const Navbar = () => {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Command Palette Trigger */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => document.dispatchEvent(new CustomEvent('open-command-palette'))}
+                  className="gap-2 text-muted-foreground hover:text-foreground"
+                >
+                  <Command className="h-4 w-4" />
+                  <span className="text-xs">⌘K</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Command Palette (Ctrl+K)</p>
+              </TooltipContent>
+            </Tooltip>
+
             {/* Theme Toggle */}
             <Tooltip>
               <TooltipTrigger asChild>

@@ -6,7 +6,9 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { WorkAssistantWidget } from "@/components/WorkAssistantWidget";
 import { FloatingWidget } from "@/components/FloatingWidget";
+import { CommandPalette } from "@/components/CommandPalette";
 import { ThemeProvider } from "next-themes";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -16,6 +18,12 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+// Component to handle keyboard shortcuts
+const KeyboardShortcutsProvider = () => {
+  useKeyboardShortcuts();
+  return null;
+};
 
 // Component to conditionally render floating widgets
 const FloatingWidgets = () => {
@@ -41,6 +49,8 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <KeyboardShortcutsProvider />
+            <CommandPalette />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
