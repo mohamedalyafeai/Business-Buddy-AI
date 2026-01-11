@@ -5,7 +5,7 @@ import {
   MessageSquare, Zap, ArrowRight, Settings, Loader2, Bot,
   Clock, Filter, Send, Database, Webhook, Save, RefreshCw,
   GitBranch, History, CheckCircle, XCircle, AlertCircle, RotateCcw,
-  Download, Upload
+  Download, Upload, Share2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { ShareWorkflowDialog } from "@/components/ShareWorkflowDialog";
 
 interface WorkflowVariable {
   key: string;
@@ -1322,7 +1323,12 @@ export const WorkflowBuilder = () => {
                           {workflow.conditions.length > 0 && ` · ${workflow.conditions.length} conditions`}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <ShareWorkflowDialog
+                          workflowId={workflow.id}
+                          workflowName={workflow.name}
+                          isSaved={workflow.isSaved || false}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
