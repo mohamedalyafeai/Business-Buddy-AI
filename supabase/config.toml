@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.schedule-workflow]
 verify_jwt = false
+
+[functions.get-shared-workflow]
+verify_jwt = false
