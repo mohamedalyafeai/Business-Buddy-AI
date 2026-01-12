@@ -302,6 +302,84 @@ const workflowTemplates: WorkflowTemplate[] = [
     ],
     conditions: [],
   },
+  {
+    id: "social_monitor",
+    name: "Social Media Monitor",
+    description: "Monitor mentions and auto-respond to engagement",
+    icon: MessageSquare,
+    nodes: [
+      { type: "trigger", nodeType: "webhook", config: {}, label: "Social Mention" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this social media mention. Determine sentiment, influence level of the user, and whether it requires a response. Identify if it's a complaint, praise, or question." }, label: "Analyze Mention" },
+      { type: "condition", nodeType: "condition", config: {}, label: "Needs Response?" },
+      { type: "ai", nodeType: "ai_respond", config: { prompt: "Draft a friendly, on-brand response appropriate for social media. Keep it concise and engaging." }, label: "Draft Reply" },
+      { type: "action", nodeType: "save_data", config: { table: "social_interactions" }, label: "Log Interaction" },
+    ],
+    conditions: [
+      { field: "lastAiOutput", operator: "contains", value: "requires response", thenAction: "continue", elseAction: "log_only" },
+    ],
+  },
+  {
+    id: "invoice_processor",
+    name: "Invoice Processor",
+    description: "Extract invoice data and route for approval",
+    icon: FileText,
+    nodes: [
+      { type: "trigger", nodeType: "email_received", config: {}, label: "Invoice Email" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Extract invoice details: vendor name, invoice number, amount, due date, line items, and payment terms. Flag any unusual amounts or terms." }, label: "Extract Invoice Data" },
+      { type: "condition", nodeType: "condition", config: {}, label: "Amount Check" },
+      { type: "action", nodeType: "save_data", config: { table: "invoices" }, label: "Save Invoice" },
+      { type: "action", nodeType: "send_email", config: { subject: "Invoice Requires Approval" }, label: "Request Approval" },
+    ],
+    conditions: [
+      { field: "amount", operator: "greater_than", value: "5000", thenAction: "require_approval", elseAction: "auto_approve" },
+    ],
+  },
+  {
+    id: "onboarding_assistant",
+    name: "Employee Onboarding",
+    description: "Automate new employee onboarding tasks",
+    icon: CheckSquare,
+    nodes: [
+      { type: "trigger", nodeType: "webhook", config: {}, label: "New Hire Added" },
+      { type: "ai", nodeType: "ai_draft", config: { prompt: "Create a personalized welcome message for the new employee. Include first-week expectations, key contacts, and helpful resources based on their role." }, label: "Welcome Message" },
+      { type: "action", nodeType: "send_email", config: { subject: "Welcome to the Team!" }, label: "Send Welcome" },
+      { type: "action", nodeType: "create_task", config: { title: "Complete onboarding checklist", priority: "high" }, label: "Create Checklist" },
+      { type: "action", nodeType: "calendar_event", config: { title: "Onboarding Session" }, label: "Schedule Onboarding" },
+    ],
+    conditions: [],
+  },
+  {
+    id: "sla_monitor",
+    name: "SLA Monitor & Alerts",
+    description: "Monitor SLA compliance and escalate violations",
+    icon: Clock,
+    nodes: [
+      { type: "trigger", nodeType: "schedule", config: { time: "*/30 * * * *", frequency: "cron" }, label: "Check Every 30min" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze open tickets and their SLA status. Identify any tickets approaching or breaching SLA thresholds. Prioritize by severity and time remaining." }, label: "SLA Analysis" },
+      { type: "condition", nodeType: "condition", config: {}, label: "SLA Breach?" },
+      { type: "action", nodeType: "send_email", config: { subject: "⚠️ SLA Alert: Action Required" }, label: "Alert Team" },
+      { type: "action", nodeType: "create_task", config: { title: "Urgent: SLA breach imminent", priority: "high" }, label: "Escalation Task" },
+    ],
+    conditions: [
+      { field: "sla_status", operator: "equals", value: "at_risk", thenAction: "escalate", elseAction: "monitor" },
+    ],
+  },
+  {
+    id: "knowledge_base",
+    name: "Knowledge Base Builder",
+    description: "Auto-generate FAQ entries from support tickets",
+    icon: Database,
+    nodes: [
+      { type: "trigger", nodeType: "webhook", config: {}, label: "Ticket Resolved" },
+      { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this resolved support ticket. Determine if it contains a common question that should be added to the knowledge base. Extract the question and solution." }, label: "Analyze Ticket" },
+      { type: "condition", nodeType: "condition", config: {}, label: "Worth Adding?" },
+      { type: "ai", nodeType: "ai_draft", config: { prompt: "Format this as a professional FAQ entry with a clear question title and comprehensive answer. Include any relevant links or steps." }, label: "Format FAQ" },
+      { type: "action", nodeType: "save_data", config: { table: "knowledge_base" }, label: "Add to KB" },
+    ],
+    conditions: [
+      { field: "lastAiOutput", operator: "contains", value: "add to knowledge base", thenAction: "continue", elseAction: "skip" },
+    ],
+  },
 ];
 
 // Convert DB workflow to UI workflow
