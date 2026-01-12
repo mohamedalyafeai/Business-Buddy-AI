@@ -24,8 +24,7 @@ import {
   PieChart as RechartsPieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
+  Legend,
 } from "recharts";
 
 interface WorkflowStats {
