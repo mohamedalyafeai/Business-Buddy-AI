@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, Trash2, Play, Mail, FileText, Calendar, CheckSquare, 
   MessageSquare, Zap, ArrowRight, Settings, Loader2, Bot,
   Clock, Filter, Send, Database, Webhook, Save, RefreshCw,
   GitBranch, History, CheckCircle, XCircle, AlertCircle, RotateCcw,
-  Download, Upload, Share2
+  Download, Upload, Share2, Search, Eye, X, Sparkles, Users, 
+  Shield, BarChart3, Briefcase
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,14 +63,26 @@ interface Condition {
   elseAction: string;
 }
 
+type TemplateCategory = "automation" | "communication" | "data" | "productivity" | "customer" | "hr";
+
 interface WorkflowTemplate {
   id: string;
   name: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
+  category: TemplateCategory;
   nodes: Omit<WorkflowNode, "id">[];
   conditions: Omit<Condition, "id">[];
 }
+
+const templateCategories: { id: TemplateCategory; label: string; icon: React.ComponentType<{ className?: string }>; color: string }[] = [
+  { id: "automation", label: "أتمتة", icon: Zap, color: "text-yellow-500" },
+  { id: "communication", label: "تواصل", icon: MessageSquare, color: "text-blue-500" },
+  { id: "data", label: "بيانات", icon: Database, color: "text-green-500" },
+  { id: "productivity", label: "إنتاجية", icon: BarChart3, color: "text-purple-500" },
+  { id: "customer", label: "عملاء", icon: Users, color: "text-orange-500" },
+  { id: "hr", label: "موارد بشرية", icon: Briefcase, color: "text-pink-500" },
+];
 
 interface Workflow {
   id: string;
@@ -150,6 +163,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Email Digest",
     description: "Summarize content and send a daily digest email",
     icon: Mail,
+    category: "communication",
     nodes: [
       { type: "trigger", nodeType: "schedule", config: { time: "09:00", frequency: "daily" }, label: "Schedule" },
       { type: "ai", nodeType: "ai_summarize", config: { prompt: "Create a concise digest summary of the following content. Include key highlights and action items." }, label: "AI Summarize" },
@@ -162,6 +176,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Task Reminder",
     description: "Analyze priorities and create task reminders",
     icon: CheckSquare,
+    category: "productivity",
     nodes: [
       { type: "trigger", nodeType: "schedule", config: { time: "08:00", frequency: "daily" }, label: "Schedule" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze the current tasks and identify high-priority items that need immediate attention. Suggest a priority order." }, label: "AI Analyze" },
@@ -174,6 +189,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Content Summarizer",
     description: "Summarize long content with sentiment-based routing",
     icon: FileText,
+    category: "data",
     nodes: [
       { type: "trigger", nodeType: "webhook", config: {}, label: "Webhook" },
       { type: "ai", nodeType: "ai_summarize", config: { prompt: "Provide a comprehensive summary of this content, extracting the main points and key insights." }, label: "AI Summarize" },
@@ -189,6 +205,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Smart Auto-Responder",
     description: "AI-powered email response with urgency detection",
     icon: MessageSquare,
+    category: "communication",
     nodes: [
       { type: "trigger", nodeType: "email_received", config: {}, label: "Email Received" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this email for urgency level (1-10) and sentiment. Extract key questions that need answers." }, label: "AI Analyze" },
@@ -205,6 +222,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Weekly Report Generator",
     description: "Generate and email weekly performance reports",
     icon: Calendar,
+    category: "productivity",
     nodes: [
       { type: "trigger", nodeType: "schedule", config: { time: "17:00", frequency: "weekly" }, label: "Schedule" },
       { type: "ai", nodeType: "ai_draft", config: { prompt: "Create a professional weekly report summarizing achievements, metrics, and areas for improvement. Format with clear sections." }, label: "AI Draft" },
@@ -217,6 +235,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Lead Qualification",
     description: "Automatically qualify leads and route to appropriate team",
     icon: Zap,
+    category: "customer",
     nodes: [
       { type: "trigger", nodeType: "webhook", config: {}, label: "New Lead Webhook" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this lead information. Score from 1-100 based on: company size, budget, urgency, and fit. Categorize as hot, warm, or cold." }, label: "AI Score Lead" },
@@ -233,6 +252,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Customer Feedback Analysis",
     description: "Analyze feedback and trigger actions based on sentiment",
     icon: MessageSquare,
+    category: "customer",
     nodes: [
       { type: "trigger", nodeType: "webhook", config: {}, label: "Feedback Received" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this customer feedback. Determine sentiment (positive/negative/neutral), extract key themes, and identify any urgent issues requiring immediate attention." }, label: "Sentiment Analysis" },
@@ -249,6 +269,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Meeting Preparation",
     description: "Auto-generate meeting briefs and agendas",
     icon: Calendar,
+    category: "productivity",
     nodes: [
       { type: "trigger", nodeType: "schedule", config: { time: "07:00", frequency: "daily" }, label: "Morning Prep" },
       { type: "ai", nodeType: "ai_summarize", config: { prompt: "Review today's scheduled meetings. For each meeting, summarize: attendees, purpose, key discussion points, and any preparation needed." }, label: "Analyze Meetings" },
@@ -262,6 +283,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Content Moderation",
     description: "AI-powered content moderation with auto-flagging",
     icon: Bot,
+    category: "automation",
     nodes: [
       { type: "trigger", nodeType: "webhook", config: {}, label: "New Content" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this content for policy violations including: spam, inappropriate language, harmful content, or misinformation. Provide a risk score (1-10) and detailed reasoning." }, label: "Content Analysis" },
@@ -278,6 +300,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Data Enrichment Pipeline",
     description: "Enrich and clean incoming data automatically",
     icon: Database,
+    category: "data",
     nodes: [
       { type: "trigger", nodeType: "webhook", config: {}, label: "Data Received" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this data entry. Validate format, check for inconsistencies, suggest corrections, and enrich with additional context where possible." }, label: "Validate & Enrich" },
@@ -293,6 +316,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Document Processor",
     description: "Extract insights from documents and route accordingly",
     icon: FileText,
+    category: "data",
     nodes: [
       { type: "trigger", nodeType: "webhook", config: {}, label: "Document Upload" },
       { type: "ai", nodeType: "ai_summarize", config: { prompt: "Extract key information from this document: document type, main topics, key dates, important figures, and action items." }, label: "Extract Info" },
@@ -307,6 +331,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Social Media Monitor",
     description: "Monitor mentions and auto-respond to engagement",
     icon: MessageSquare,
+    category: "communication",
     nodes: [
       { type: "trigger", nodeType: "webhook", config: {}, label: "Social Mention" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this social media mention. Determine sentiment, influence level of the user, and whether it requires a response. Identify if it's a complaint, praise, or question." }, label: "Analyze Mention" },
@@ -323,6 +348,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Invoice Processor",
     description: "Extract invoice data and route for approval",
     icon: FileText,
+    category: "data",
     nodes: [
       { type: "trigger", nodeType: "email_received", config: {}, label: "Invoice Email" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Extract invoice details: vendor name, invoice number, amount, due date, line items, and payment terms. Flag any unusual amounts or terms." }, label: "Extract Invoice Data" },
@@ -339,6 +365,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Employee Onboarding",
     description: "Automate new employee onboarding tasks",
     icon: CheckSquare,
+    category: "hr",
     nodes: [
       { type: "trigger", nodeType: "webhook", config: {}, label: "New Hire Added" },
       { type: "ai", nodeType: "ai_draft", config: { prompt: "Create a personalized welcome message for the new employee. Include first-week expectations, key contacts, and helpful resources based on their role." }, label: "Welcome Message" },
@@ -353,6 +380,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "SLA Monitor & Alerts",
     description: "Monitor SLA compliance and escalate violations",
     icon: Clock,
+    category: "automation",
     nodes: [
       { type: "trigger", nodeType: "schedule", config: { time: "*/30 * * * *", frequency: "cron" }, label: "Check Every 30min" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze open tickets and their SLA status. Identify any tickets approaching or breaching SLA thresholds. Prioritize by severity and time remaining." }, label: "SLA Analysis" },
@@ -369,6 +397,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     name: "Knowledge Base Builder",
     description: "Auto-generate FAQ entries from support tickets",
     icon: Database,
+    category: "data",
     nodes: [
       { type: "trigger", nodeType: "webhook", config: {}, label: "Ticket Resolved" },
       { type: "ai", nodeType: "ai_analyze", config: { prompt: "Analyze this resolved support ticket. Determine if it contains a common question that should be added to the knowledge base. Extract the question and solution." }, label: "Analyze Ticket" },
@@ -455,6 +484,20 @@ export const WorkflowBuilder = () => {
   const [editingCondition, setEditingCondition] = useState<Condition | null>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [restoringVersion, setRestoringVersion] = useState<string | null>(null);
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | "all">("all");
+  const [previewTemplate, setPreviewTemplate] = useState<WorkflowTemplate | null>(null);
+
+  // Filter templates based on search and category
+  const filteredTemplates = useMemo(() => {
+    return workflowTemplates.filter((template) => {
+      const matchesSearch = templateSearch === "" || 
+        template.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+        template.description.toLowerCase().includes(templateSearch.toLowerCase());
+      const matchesCategory = selectedCategory === "all" || template.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [templateSearch, selectedCategory]);
 
   // Load workflows from database
   useEffect(() => {
@@ -1276,47 +1319,259 @@ export const WorkflowBuilder = () => {
             </Button>
           )}
           
-          <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+          <Dialog open={templateDialogOpen} onOpenChange={(open) => {
+            setTemplateDialogOpen(open);
+            if (!open) {
+              setTemplateSearch("");
+              setSelectedCategory("all");
+              setPreviewTemplate(null);
+            }
+          }}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
                 <FileText className="w-4 h-4 mr-2" />
                 Templates
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className="max-w-4xl max-h-[85vh]">
               <DialogHeader>
-                <DialogTitle>Workflow Templates</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Workflow Templates
+                </DialogTitle>
               </DialogHeader>
-              <p className="text-sm text-muted-foreground mb-4">
-                Choose a template to quickly create a pre-configured workflow
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
-                {workflowTemplates.map((template) => (
-                  <button
-                    key={template.id}
-                    onClick={() => createFromTemplate(template)}
-                    className="flex items-start gap-4 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+              
+              {/* Search and Filter */}
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search templates..."
+                    value={templateSearch}
+                    onChange={(e) => setTemplateSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                  {templateSearch && (
+                    <button
+                      onClick={() => setTemplateSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Filter */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={selectedCategory === "all" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedCategory("all")}
+                    className="h-8"
                   >
-                    <div className="p-3 rounded-lg bg-primary/10">
-                      <template.icon className="w-6 h-6 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-foreground">{template.name}</h4>
-                      <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {template.nodes.length} nodes
-                        </Badge>
-                        {template.conditions.length > 0 && (
-                          <Badge variant="outline" className="text-xs">
-                            {template.conditions.length} conditions
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                    <Filter className="w-3 h-3 mr-1" />
+                    All
+                  </Button>
+                  {templateCategories.map((cat) => (
+                    <Button
+                      key={cat.id}
+                      variant={selectedCategory === cat.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className="h-8"
+                    >
+                      <cat.icon className={`w-3 h-3 mr-1 ${selectedCategory !== cat.id ? cat.color : ""}`} />
+                      {cat.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
+
+              {/* Templates Grid or Preview */}
+              {previewTemplate ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPreviewTemplate(null)}
+                    >
+                      <ArrowRight className="w-4 h-4 rotate-180 mr-1" />
+                      Back to templates
+                    </Button>
+                  </div>
+
+                  <Card className="bg-card border-border">
+                    <CardHeader>
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 rounded-lg bg-primary/10">
+                          <previewTemplate.icon className="w-8 h-8 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <CardTitle className="text-xl">{previewTemplate.name}</CardTitle>
+                          <p className="text-muted-foreground mt-1">{previewTemplate.description}</p>
+                          <div className="flex items-center gap-2 mt-3">
+                            <Badge variant="secondary">
+                              {templateCategories.find(c => c.id === previewTemplate.category)?.label}
+                            </Badge>
+                            <Badge variant="outline">
+                              {previewTemplate.nodes.length} nodes
+                            </Badge>
+                            {previewTemplate.conditions.length > 0 && (
+                              <Badge variant="outline">
+                                {previewTemplate.conditions.length} conditions
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Workflow Steps Preview */}
+                      <div>
+                        <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
+                          <GitBranch className="w-4 h-4" />
+                          Workflow Steps
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-3">
+                          {previewTemplate.nodes.map((node, index) => {
+                            const nodeInfo = node.type === "trigger" 
+                              ? nodeTypes.triggers.find(t => t.id === node.nodeType)
+                              : node.type === "ai"
+                              ? nodeTypes.ai.find(t => t.id === node.nodeType)
+                              : node.type === "condition"
+                              ? nodeTypes.conditions.find(t => t.id === node.nodeType)
+                              : nodeTypes.actions.find(t => t.id === node.nodeType);
+                            const NodeIcon = nodeInfo?.icon || Zap;
+                            const colorClass = node.type === "trigger" ? "border-blue-500/50 bg-blue-500/10" 
+                              : node.type === "ai" ? "border-violet-500/50 bg-violet-500/10"
+                              : node.type === "condition" ? "border-amber-500/50 bg-amber-500/10"
+                              : "border-green-500/50 bg-green-500/10";
+                            const iconColor = node.type === "trigger" ? "text-blue-500" 
+                              : node.type === "ai" ? "text-violet-500"
+                              : node.type === "condition" ? "text-amber-500"
+                              : "text-green-500";
+
+                            return (
+                              <div key={index} className="flex items-center gap-3">
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: index * 0.1 }}
+                                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 ${colorClass}`}
+                                >
+                                  <NodeIcon className={`w-5 h-5 ${iconColor}`} />
+                                  <span className="text-xs font-medium">{node.label}</span>
+                                  <Badge variant="outline" className="text-[10px] h-5">
+                                    {node.type}
+                                  </Badge>
+                                </motion.div>
+                                {index < previewTemplate.nodes.length - 1 && (
+                                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Conditions Preview */}
+                      {previewTemplate.conditions.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                            <GitBranch className="w-4 h-4" />
+                            Conditions
+                          </h4>
+                          <div className="space-y-2">
+                            {previewTemplate.conditions.map((condition, index) => (
+                              <div key={index} className="p-3 rounded-lg bg-muted/50 border border-border text-sm">
+                                <span className="font-medium text-amber-500">If</span>{" "}
+                                <code className="bg-background px-1 rounded">{condition.field}</code>{" "}
+                                <span className="text-muted-foreground">{condition.operator.replace(/_/g, " ")}</span>{" "}
+                                <code className="bg-background px-1 rounded">"{condition.value}"</code>
+                                <br />
+                                <span className="text-green-500">→ Then:</span> {condition.thenAction}{" "}
+                                <span className="text-muted-foreground">|</span>{" "}
+                                <span className="text-red-500">→ Else:</span> {condition.elseAction}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <Button
+                        className="w-full"
+                        onClick={() => {
+                          createFromTemplate(previewTemplate);
+                          setPreviewTemplate(null);
+                        }}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Use This Template
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+                  {filteredTemplates.length === 0 ? (
+                    <div className="col-span-2 text-center py-12">
+                      <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No templates found</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Try adjusting your search or filters
+                      </p>
+                    </div>
+                  ) : (
+                    filteredTemplates.map((template) => {
+                      const categoryInfo = templateCategories.find(c => c.id === template.category);
+                      return (
+                        <div
+                          key={template.id}
+                          className="flex items-start gap-3 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                        >
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <template.icon className="w-5 h-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-foreground truncate">{template.name}</h4>
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{template.description}</p>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              {categoryInfo && (
+                                <Badge variant="outline" className={`text-[10px] h-5 ${categoryInfo.color}`}>
+                                  {categoryInfo.label}
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="text-[10px] h-5">
+                                {template.nodes.length} nodes
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 mt-3">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs"
+                                onClick={() => setPreviewTemplate(template)}
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                Preview
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => createFromTemplate(template)}
+                              >
+                                <Plus className="w-3 h-3 mr-1" />
+                                Use
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </DialogContent>
           </Dialog>
           <Button onClick={() => setIsCreating(true)} size="sm">
