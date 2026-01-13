@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, Trash2, Play, Mail, FileText, Calendar, CheckSquare, 
@@ -6,7 +6,7 @@ import {
   Clock, Filter, Send, Database, Webhook, Save, RefreshCw,
   GitBranch, History, CheckCircle, XCircle, AlertCircle, RotateCcw,
   Download, Upload, Share2, Search, Eye, X, Sparkles, Users, 
-  Shield, BarChart3, Briefcase
+  Shield, BarChart3, Briefcase, Star, Copy
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,14 +75,60 @@ interface WorkflowTemplate {
   conditions: Omit<Condition, "id">[];
 }
 
-const templateCategories: { id: TemplateCategory; label: string; icon: React.ComponentType<{ className?: string }>; color: string }[] = [
-  { id: "automation", label: "أتمتة", icon: Zap, color: "text-yellow-500" },
+const templateCategories: { id: TemplateCategory | "favorites" | "custom"; label: string; icon: React.ComponentType<{ className?: string }>; color: string }[] = [
+  { id: "favorites", label: "المفضلة", icon: Star, color: "text-yellow-500" },
+  { id: "custom", label: "مخصصة", icon: Sparkles, color: "text-cyan-500" },
+  { id: "automation", label: "أتمتة", icon: Zap, color: "text-amber-500" },
   { id: "communication", label: "تواصل", icon: MessageSquare, color: "text-blue-500" },
   { id: "data", label: "بيانات", icon: Database, color: "text-green-500" },
   { id: "productivity", label: "إنتاجية", icon: BarChart3, color: "text-purple-500" },
   { id: "customer", label: "عملاء", icon: Users, color: "text-orange-500" },
   { id: "hr", label: "موارد بشرية", icon: Briefcase, color: "text-pink-500" },
 ];
+
+// Custom template interface (saved by user)
+interface CustomTemplate extends WorkflowTemplate {
+  isCustom: true;
+  createdAt: string;
+}
+
+// Helper functions for localStorage
+const FAVORITES_KEY = "workflow_template_favorites";
+const CUSTOM_TEMPLATES_KEY = "workflow_custom_templates";
+
+const getFavoriteTemplates = (): string[] => {
+  try {
+    const stored = localStorage.getItem(FAVORITES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const setFavoriteTemplates = (favorites: string[]) => {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+};
+
+const getCustomTemplates = (): CustomTemplate[] => {
+  try {
+    const stored = localStorage.getItem(CUSTOM_TEMPLATES_KEY);
+    if (!stored) return [];
+    const templates = JSON.parse(stored);
+    // Restore icon references
+    return templates.map((t: CustomTemplate) => ({
+      ...t,
+      icon: Sparkles, // Custom templates use Sparkles icon
+    }));
+  } catch {
+    return [];
+  }
+};
+
+const saveCustomTemplates = (templates: CustomTemplate[]) => {
+  // Remove icon reference before saving (can't serialize functions)
+  const toSave = templates.map(({ icon, ...rest }) => rest);
+  localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(toSave));
+};
 
 interface Workflow {
   id: string;
@@ -485,19 +531,109 @@ export const WorkflowBuilder = () => {
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [restoringVersion, setRestoringVersion] = useState<string | null>(null);
   const [templateSearch, setTemplateSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | "all">("all");
+  const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | "favorites" | "custom" | "all">("all");
   const [previewTemplate, setPreviewTemplate] = useState<WorkflowTemplate | null>(null);
+  const [favoriteTemplates, setFavoriteTemplatesState] = useState<string[]>([]);
+  const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
+  const [saveAsTemplateDialogOpen, setSaveAsTemplateDialogOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [newTemplateDescription, setNewTemplateDescription] = useState("");
+  const [newTemplateCategory, setNewTemplateCategory] = useState<TemplateCategory>("automation");
 
-  // Filter templates based on search and category
+  // Load favorites and custom templates on mount
+  useEffect(() => {
+    setFavoriteTemplatesState(getFavoriteTemplates());
+    setCustomTemplates(getCustomTemplates());
+  }, []);
+
+  // Toggle favorite template
+  const toggleFavorite = useCallback((templateId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setFavoriteTemplatesState(prev => {
+      const newFavorites = prev.includes(templateId)
+        ? prev.filter(id => id !== templateId)
+        : [...prev, templateId];
+      setFavoriteTemplates(newFavorites);
+      return newFavorites;
+    });
+  }, []);
+
+  // Delete custom template
+  const deleteCustomTemplate = useCallback((templateId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setCustomTemplates(prev => {
+      const newTemplates = prev.filter(t => t.id !== templateId);
+      saveCustomTemplates(newTemplates);
+      return newTemplates;
+    });
+    toast.success("Custom template deleted");
+  }, []);
+
+  // Save workflow as custom template
+  const saveAsCustomTemplate = useCallback(() => {
+    if (!selectedWorkflow || !newTemplateName.trim()) {
+      toast.error("Please enter a template name");
+      return;
+    }
+
+    const customTemplate: CustomTemplate = {
+      id: `custom-${Date.now()}`,
+      name: newTemplateName.trim(),
+      description: newTemplateDescription.trim() || `Custom template from ${selectedWorkflow.name}`,
+      icon: Sparkles,
+      category: newTemplateCategory,
+      nodes: selectedWorkflow.nodes.map(({ id, ...rest }) => rest),
+      conditions: selectedWorkflow.conditions.map(({ id, ...rest }) => rest),
+      isCustom: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    setCustomTemplates(prev => {
+      const newTemplates = [customTemplate, ...prev];
+      saveCustomTemplates(newTemplates);
+      return newTemplates;
+    });
+
+    setSaveAsTemplateDialogOpen(false);
+    setNewTemplateName("");
+    setNewTemplateDescription("");
+    setNewTemplateCategory("automation");
+    toast.success("Workflow saved as custom template!");
+  }, [selectedWorkflow, newTemplateName, newTemplateDescription, newTemplateCategory]);
+
+  // Filter templates based on search, category, and favorites
   const filteredTemplates = useMemo(() => {
-    return workflowTemplates.filter((template) => {
+    // Combine built-in and custom templates
+    const allTemplates: (WorkflowTemplate | CustomTemplate)[] = [...customTemplates, ...workflowTemplates];
+    
+    return allTemplates.filter((template) => {
       const matchesSearch = templateSearch === "" || 
         template.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
         template.description.toLowerCase().includes(templateSearch.toLowerCase());
+      
+      // Handle special categories
+      if (selectedCategory === "favorites") {
+        return matchesSearch && favoriteTemplates.includes(template.id);
+      }
+      if (selectedCategory === "custom") {
+        return matchesSearch && 'isCustom' in template;
+      }
+      
       const matchesCategory = selectedCategory === "all" || template.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [templateSearch, selectedCategory]);
+  }, [templateSearch, selectedCategory, favoriteTemplates, customTemplates]);
+
+  // Sort templates with favorites at the top
+  const sortedTemplates = useMemo(() => {
+    return [...filteredTemplates].sort((a, b) => {
+      const aIsFavorite = favoriteTemplates.includes(a.id);
+      const bIsFavorite = favoriteTemplates.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return 0;
+    });
+  }, [filteredTemplates, favoriteTemplates]);
 
   // Load workflows from database
   useEffect(() => {
@@ -1408,9 +1544,24 @@ export const WorkflowBuilder = () => {
                           <previewTemplate.icon className="w-8 h-8 text-primary" />
                         </div>
                         <div className="flex-1">
-                          <CardTitle className="text-xl">{previewTemplate.name}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-xl">{previewTemplate.name}</CardTitle>
+                            {'isCustom' in previewTemplate ? (
+                              <Badge variant="outline" className="text-cyan-500 border-cyan-500">
+                                مخصص
+                              </Badge>
+                            ) : (
+                              <button
+                                onClick={(e) => toggleFavorite(previewTemplate.id, e)}
+                                className="p-1.5 rounded-full hover:bg-muted transition-colors"
+                                title={favoriteTemplates.includes(previewTemplate.id) ? "Remove from favorites" : "Add to favorites"}
+                              >
+                                <Star className={`w-5 h-5 ${favoriteTemplates.includes(previewTemplate.id) ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`} />
+                              </button>
+                            )}
+                          </div>
                           <p className="text-muted-foreground mt-1">{previewTemplate.description}</p>
-                          <div className="flex items-center gap-2 mt-3">
+                          <div className="flex items-center gap-2 mt-3 flex-wrap">
                             <Badge variant="secondary">
                               {templateCategories.find(c => c.id === previewTemplate.category)?.label}
                             </Badge>
@@ -1420,6 +1571,12 @@ export const WorkflowBuilder = () => {
                             {previewTemplate.conditions.length > 0 && (
                               <Badge variant="outline">
                                 {previewTemplate.conditions.length} conditions
+                              </Badge>
+                            )}
+                            {favoriteTemplates.includes(previewTemplate.id) && !('isCustom' in previewTemplate) && (
+                              <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                                <Star className="w-3 h-3 mr-1 fill-current" />
+                                مفضل
                               </Badge>
                             )}
                           </div>
@@ -1514,27 +1671,53 @@ export const WorkflowBuilder = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
-                  {filteredTemplates.length === 0 ? (
+                  {sortedTemplates.length === 0 ? (
                     <div className="col-span-2 text-center py-12">
                       <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                       <p className="text-muted-foreground">No templates found</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Try adjusting your search or filters
+                        {selectedCategory === "favorites" 
+                          ? "Star templates to add them to your favorites"
+                          : selectedCategory === "custom"
+                          ? "Save workflows as templates to see them here"
+                          : "Try adjusting your search or filters"}
                       </p>
                     </div>
                   ) : (
-                    filteredTemplates.map((template) => {
+                    sortedTemplates.map((template) => {
                       const categoryInfo = templateCategories.find(c => c.id === template.category);
+                      const isFavorite = favoriteTemplates.includes(template.id);
+                      const isCustom = 'isCustom' in template;
                       return (
                         <div
                           key={template.id}
-                          className="flex items-start gap-3 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                          className="relative flex items-start gap-3 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
                         >
+                          {/* Favorite/Delete Button */}
+                          <button
+                            onClick={(e) => isCustom ? deleteCustomTemplate(template.id, e) : toggleFavorite(template.id, e)}
+                            className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted transition-colors"
+                            title={isCustom ? "Delete custom template" : (isFavorite ? "Remove from favorites" : "Add to favorites")}
+                          >
+                            {isCustom ? (
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            ) : (
+                              <Star className={`w-4 h-4 ${isFavorite ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`} />
+                            )}
+                          </button>
+
                           <div className="p-2 rounded-lg bg-primary/10">
                             <template.icon className="w-5 h-5 text-primary" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-foreground truncate">{template.name}</h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-foreground truncate">{template.name}</h4>
+                              {isCustom && (
+                                <Badge variant="outline" className="text-[10px] h-5 text-cyan-500 border-cyan-500">
+                                  مخصص
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{template.description}</p>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                               {categoryInfo && (
@@ -1545,6 +1728,12 @@ export const WorkflowBuilder = () => {
                               <Badge variant="secondary" className="text-[10px] h-5">
                                 {template.nodes.length} nodes
                               </Badge>
+                              {isFavorite && !isCustom && (
+                                <Badge variant="outline" className="text-[10px] h-5 text-yellow-500 border-yellow-500">
+                                  <Star className="w-3 h-3 mr-1 fill-current" />
+                                  مفضل
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 mt-3">
                               <Button
@@ -1757,7 +1946,7 @@ export const WorkflowBuilder = () => {
                         Build your automation by adding nodes. Click a node to configure it.
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         variant="outline"
                         size="sm"
@@ -1770,6 +1959,20 @@ export const WorkflowBuilder = () => {
                           <Save className="w-4 h-4 mr-2" />
                         )}
                         Save
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setNewTemplateName(selectedWorkflow.name);
+                          setNewTemplateDescription("");
+                          setSaveAsTemplateDialogOpen(true);
+                        }}
+                        disabled={selectedWorkflow.nodes.length === 0}
+                        title="Save workflow as a reusable template"
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Save as Template
                       </Button>
                       <Button
                         variant="outline"
@@ -2254,6 +2457,72 @@ export const WorkflowBuilder = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Save as Template Dialog */}
+      <Dialog open={saveAsTemplateDialogOpen} onOpenChange={setSaveAsTemplateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="w-5 h-5 text-primary" />
+              Save as Custom Template
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Template Name</Label>
+              <Input
+                placeholder="My Custom Template..."
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Description (optional)</Label>
+              <Textarea
+                placeholder="Describe what this template does..."
+                value={newTemplateDescription}
+                onChange={(e) => setNewTemplateDescription(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Category</Label>
+              <Select
+                value={newTemplateCategory}
+                onValueChange={(value) => setNewTemplateCategory(value as TemplateCategory)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="automation">أتمتة (Automation)</SelectItem>
+                  <SelectItem value="communication">تواصل (Communication)</SelectItem>
+                  <SelectItem value="data">بيانات (Data)</SelectItem>
+                  <SelectItem value="productivity">إنتاجية (Productivity)</SelectItem>
+                  <SelectItem value="customer">عملاء (Customer)</SelectItem>
+                  <SelectItem value="hr">موارد بشرية (HR)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-sm text-muted-foreground">
+                <Sparkles className="w-4 h-4 inline mr-1" />
+                This will create a reusable template from your current workflow with{" "}
+                <strong>{selectedWorkflow?.nodes.length || 0}</strong> nodes and{" "}
+                <strong>{selectedWorkflow?.conditions.length || 0}</strong> conditions.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setSaveAsTemplateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveAsCustomTemplate}>
+                <Copy className="w-4 h-4 mr-2" />
+                Save Template
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
