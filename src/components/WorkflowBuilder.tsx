@@ -569,6 +569,79 @@ export const WorkflowBuilder = () => {
     toast.success("Custom template deleted");
   }, []);
 
+  // Export custom templates as JSON
+  const exportCustomTemplates = useCallback(() => {
+    if (customTemplates.length === 0) {
+      toast.error("No custom templates to export");
+      return;
+    }
+
+    const exportData = {
+      version: "1.0",
+      type: "lovable_custom_templates",
+      exportedAt: new Date().toISOString(),
+      templates: customTemplates.map(({ icon, ...rest }) => rest),
+    };
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `custom-templates-${format(new Date(), "yyyy-MM-dd")}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${customTemplates.length} custom templates`);
+  }, [customTemplates]);
+
+  // Import custom templates from JSON
+  const importCustomTemplates = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // Validate the format
+      if (data.type !== "lovable_custom_templates" || !Array.isArray(data.templates)) {
+        throw new Error("Invalid custom templates format");
+      }
+
+      let imported = 0;
+      const newTemplates: CustomTemplate[] = [];
+
+      for (const templateData of data.templates) {
+        // Generate new ID to avoid conflicts
+        const newTemplate: CustomTemplate = {
+          ...templateData,
+          id: `custom-${Date.now()}-${imported}`,
+          icon: Sparkles,
+          isCustom: true,
+          createdAt: templateData.createdAt || new Date().toISOString(),
+        };
+        newTemplates.push(newTemplate);
+        imported++;
+      }
+
+      setCustomTemplates(prev => {
+        const updated = [...newTemplates, ...prev];
+        saveCustomTemplates(updated);
+        return updated;
+      });
+
+      toast.success(`Imported ${imported} custom templates`);
+    } catch (error) {
+      console.error("Error importing custom templates:", error);
+      toast.error("Failed to import templates. Please check the file format.");
+    }
+
+    // Reset file input
+    event.target.value = "";
+  }, []);
+
   // Save workflow as custom template
   const saveAsCustomTemplate = useCallback(() => {
     if (!selectedWorkflow || !newTemplateName.trim()) {
@@ -1479,21 +1552,47 @@ export const WorkflowBuilder = () => {
               
               {/* Search and Filter */}
               <div className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search templates..."
-                    value={templateSearch}
-                    onChange={(e) => setTemplateSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                  {templateSearch && (
-                    <button
-                      onClick={() => setTemplateSearch("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search templates..."
+                      value={templateSearch}
+                      onChange={(e) => setTemplateSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                    {templateSearch && (
+                      <button
+                        onClick={() => setTemplateSearch("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Import/Export Custom Templates */}
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={importCustomTemplates}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      title="Import custom templates from JSON"
+                    />
+                    <Button variant="outline" size="icon" title="Import custom templates">
+                      <Upload className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {customTemplates.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={exportCustomTemplates}
+                      title="Export custom templates"
                     >
-                      <X className="w-4 h-4" />
-                    </button>
+                      <Download className="w-4 h-4" />
+                    </Button>
                   )}
                 </div>
 
@@ -1508,18 +1607,31 @@ export const WorkflowBuilder = () => {
                     <Filter className="w-3 h-3 mr-1" />
                     All
                   </Button>
-                  {templateCategories.map((cat) => (
-                    <Button
-                      key={cat.id}
-                      variant={selectedCategory === cat.id ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className="h-8"
-                    >
-                      <cat.icon className={`w-3 h-3 mr-1 ${selectedCategory !== cat.id ? cat.color : ""}`} />
-                      {cat.label}
-                    </Button>
-                  ))}
+                  {templateCategories.map((cat) => {
+                    // Show badge count for favorites and custom categories
+                    const count = cat.id === "favorites" 
+                      ? favoriteTemplates.length 
+                      : cat.id === "custom" 
+                      ? customTemplates.length 
+                      : 0;
+                    return (
+                      <Button
+                        key={cat.id}
+                        variant={selectedCategory === cat.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedCategory(cat.id)}
+                        className="h-8"
+                      >
+                        <cat.icon className={`w-3 h-3 mr-1 ${selectedCategory !== cat.id ? cat.color : ""}`} />
+                        {cat.label}
+                        {count > 0 && (
+                          <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1">
+                            {count}
+                          </Badge>
+                        )}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
 
