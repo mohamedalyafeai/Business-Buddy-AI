@@ -6,7 +6,7 @@ import {
   Clock, Filter, Send, Database, Webhook, Save, RefreshCw,
   GitBranch, History, CheckCircle, XCircle, AlertCircle, RotateCcw,
   Download, Upload, Share2, Search, Eye, X, Sparkles, Users, 
-  Shield, BarChart3, Briefcase, Star, Copy
+  Shield, BarChart3, Briefcase, Star, Copy, Pencil, Link2, Check
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -539,6 +539,13 @@ export const WorkflowBuilder = () => {
   const [newTemplateName, setNewTemplateName] = useState("");
   const [newTemplateDescription, setNewTemplateDescription] = useState("");
   const [newTemplateCategory, setNewTemplateCategory] = useState<TemplateCategory>("automation");
+  const [editTemplateDialogOpen, setEditTemplateDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<CustomTemplate | null>(null);
+  const [shareTemplateDialogOpen, setShareTemplateDialogOpen] = useState(false);
+  const [sharingTemplate, setSharingTemplate] = useState<CustomTemplate | null>(null);
+  const [importLinkDialogOpen, setImportLinkDialogOpen] = useState(false);
+  const [importLink, setImportLink] = useState("");
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Load favorites and custom templates on mount
   useEffect(() => {
@@ -567,6 +574,164 @@ export const WorkflowBuilder = () => {
       return newTemplates;
     });
     toast.success("Custom template deleted");
+  }, []);
+
+  // Edit custom template
+  const openEditTemplateDialog = useCallback((template: CustomTemplate, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditingTemplate(template);
+    setNewTemplateName(template.name);
+    setNewTemplateDescription(template.description);
+    setNewTemplateCategory(template.category);
+    setEditTemplateDialogOpen(true);
+  }, []);
+
+  // Save edited template
+  const saveEditedTemplate = useCallback(() => {
+    if (!editingTemplate || !newTemplateName.trim()) {
+      toast.error("Please enter a template name");
+      return;
+    }
+
+    setCustomTemplates(prev => {
+      const updated = prev.map(t => 
+        t.id === editingTemplate.id 
+          ? {
+              ...t,
+              name: newTemplateName.trim(),
+              description: newTemplateDescription.trim() || t.description,
+              category: newTemplateCategory,
+            }
+          : t
+      );
+      saveCustomTemplates(updated);
+      return updated;
+    });
+
+    setEditTemplateDialogOpen(false);
+    setEditingTemplate(null);
+    setNewTemplateName("");
+    setNewTemplateDescription("");
+    setNewTemplateCategory("automation");
+    toast.success("Template updated successfully!");
+  }, [editingTemplate, newTemplateName, newTemplateDescription, newTemplateCategory]);
+
+  // Generate share link for template
+  const generateShareLink = useCallback((template: CustomTemplate) => {
+    const shareData = {
+      v: "1",
+      t: {
+        name: template.name,
+        description: template.description,
+        category: template.category,
+        nodes: template.nodes,
+        conditions: template.conditions,
+      }
+    };
+    
+    const encoded = btoa(encodeURIComponent(JSON.stringify(shareData)));
+    const url = `${window.location.origin}${window.location.pathname}?import_template=${encoded}`;
+    return url;
+  }, []);
+
+  // Copy share link
+  const copyShareLink = useCallback((template: CustomTemplate) => {
+    const link = generateShareLink(template);
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    toast.success("Share link copied to clipboard!");
+    setTimeout(() => setCopiedLink(false), 2000);
+  }, [generateShareLink]);
+
+  // Open share dialog
+  const openShareDialog = useCallback((template: CustomTemplate, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSharingTemplate(template);
+    setCopiedLink(false);
+    setShareTemplateDialogOpen(true);
+  }, []);
+
+  // Import template from link
+  const importFromLink = useCallback(() => {
+    try {
+      const url = new URL(importLink);
+      const encoded = url.searchParams.get("import_template");
+      if (!encoded) {
+        throw new Error("Invalid share link");
+      }
+
+      const decoded = JSON.parse(decodeURIComponent(atob(encoded)));
+      if (!decoded.t || !decoded.t.name) {
+        throw new Error("Invalid template data");
+      }
+
+      const newTemplate: CustomTemplate = {
+        id: `custom-${Date.now()}`,
+        name: decoded.t.name,
+        description: decoded.t.description || "",
+        icon: Sparkles,
+        category: decoded.t.category || "automation",
+        nodes: decoded.t.nodes || [],
+        conditions: decoded.t.conditions || [],
+        isCustom: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      setCustomTemplates(prev => {
+        const updated = [newTemplate, ...prev];
+        saveCustomTemplates(updated);
+        return updated;
+      });
+
+      setImportLinkDialogOpen(false);
+      setImportLink("");
+      toast.success("Template imported successfully!");
+    } catch (error) {
+      console.error("Error importing template:", error);
+      toast.error("Invalid share link. Please check and try again.");
+    }
+  }, [importLink]);
+
+  // Check URL for import_template parameter on mount
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const encoded = url.searchParams.get("import_template");
+    if (encoded) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(atob(encoded)));
+        if (decoded.t && decoded.t.name) {
+          const newTemplate: CustomTemplate = {
+            id: `custom-${Date.now()}`,
+            name: decoded.t.name,
+            description: decoded.t.description || "",
+            icon: Sparkles,
+            category: decoded.t.category || "automation",
+            nodes: decoded.t.nodes || [],
+            conditions: decoded.t.conditions || [],
+            isCustom: true,
+            createdAt: new Date().toISOString(),
+          };
+
+          setCustomTemplates(prev => {
+            // Check if already exists
+            if (prev.some(t => t.name === newTemplate.name && JSON.stringify(t.nodes) === JSON.stringify(newTemplate.nodes))) {
+              toast.info("This template is already in your collection");
+              return prev;
+            }
+            const updated = [newTemplate, ...prev];
+            saveCustomTemplates(updated);
+            toast.success(`Template "${newTemplate.name}" imported!`);
+            return updated;
+          });
+
+          // Clear the URL parameter
+          url.searchParams.delete("import_template");
+          window.history.replaceState({}, "", url.toString());
+        }
+      } catch (error) {
+        console.error("Error auto-importing template:", error);
+      }
+    }
   }, []);
 
   // Export custom templates as JSON
@@ -1584,6 +1749,14 @@ export const WorkflowBuilder = () => {
                       <Upload className="w-4 h-4" />
                     </Button>
                   </div>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => setImportLinkDialogOpen(true)}
+                    title="Import from share link"
+                  >
+                    <Link2 className="w-4 h-4" />
+                  </Button>
                   {customTemplates.length > 0 && (
                     <Button 
                       variant="outline" 
@@ -1805,18 +1978,40 @@ export const WorkflowBuilder = () => {
                           key={template.id}
                           className="relative flex items-start gap-3 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
                         >
-                          {/* Favorite/Delete Button */}
-                          <button
-                            onClick={(e) => isCustom ? deleteCustomTemplate(template.id, e) : toggleFavorite(template.id, e)}
-                            className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted transition-colors"
-                            title={isCustom ? "Delete custom template" : (isFavorite ? "Remove from favorites" : "Add to favorites")}
-                          >
-                            {isCustom ? (
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            ) : (
+                          {/* Action Buttons for Custom Templates */}
+                          {isCustom ? (
+                            <div className="absolute top-2 right-2 flex items-center gap-1">
+                              <button
+                                onClick={(e) => openShareDialog(template as CustomTemplate, e)}
+                                className="p-1 rounded-full hover:bg-muted transition-colors"
+                                title="Share template via link"
+                              >
+                                <Link2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                              </button>
+                              <button
+                                onClick={(e) => openEditTemplateDialog(template as CustomTemplate, e)}
+                                className="p-1 rounded-full hover:bg-muted transition-colors"
+                                title="Edit template"
+                              >
+                                <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                              </button>
+                              <button
+                                onClick={(e) => deleteCustomTemplate(template.id, e)}
+                                className="p-1 rounded-full hover:bg-muted transition-colors"
+                                title="Delete custom template"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => toggleFavorite(template.id, e)}
+                              className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted transition-colors"
+                              title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                            >
                               <Star className={`w-4 h-4 ${isFavorite ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`} />
-                            )}
-                          </button>
+                            </button>
+                          )}
 
                           <div className="p-2 rounded-lg bg-primary/10">
                             <template.icon className="w-5 h-5 text-primary" />
@@ -2632,6 +2827,190 @@ export const WorkflowBuilder = () => {
               <Button onClick={saveAsCustomTemplate}>
                 <Copy className="w-4 h-4 mr-2" />
                 Save Template
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Template Dialog */}
+      <Dialog open={editTemplateDialogOpen} onOpenChange={(open) => {
+        setEditTemplateDialogOpen(open);
+        if (!open) {
+          setEditingTemplate(null);
+          setNewTemplateName("");
+          setNewTemplateDescription("");
+          setNewTemplateCategory("automation");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-primary" />
+              Edit Custom Template
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Template Name</Label>
+              <Input
+                placeholder="Template name..."
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Describe what this template does..."
+                value={newTemplateDescription}
+                onChange={(e) => setNewTemplateDescription(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Category</Label>
+              <Select
+                value={newTemplateCategory}
+                onValueChange={(value) => setNewTemplateCategory(value as TemplateCategory)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="automation">أتمتة (Automation)</SelectItem>
+                  <SelectItem value="communication">تواصل (Communication)</SelectItem>
+                  <SelectItem value="data">بيانات (Data)</SelectItem>
+                  <SelectItem value="productivity">إنتاجية (Productivity)</SelectItem>
+                  <SelectItem value="customer">عملاء (Customer)</SelectItem>
+                  <SelectItem value="hr">موارد بشرية (HR)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editingTemplate && (
+              <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                <p className="text-sm text-muted-foreground">
+                  <Sparkles className="w-4 h-4 inline mr-1" />
+                  This template has{" "}
+                  <strong>{editingTemplate.nodes.length}</strong> nodes and{" "}
+                  <strong>{editingTemplate.conditions.length}</strong> conditions.
+                </p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setEditTemplateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveEditedTemplate}>
+                <Check className="w-4 h-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Template Dialog */}
+      <Dialog open={shareTemplateDialogOpen} onOpenChange={(open) => {
+        setShareTemplateDialogOpen(open);
+        if (!open) {
+          setSharingTemplate(null);
+          setCopiedLink(false);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-primary" />
+              Share Template
+            </DialogTitle>
+          </DialogHeader>
+          {sharingTemplate && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">{sharingTemplate.name}</h4>
+                    <p className="text-sm text-muted-foreground">{sharingTemplate.description}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <Label>Share Link</Label>
+                <div className="flex gap-2 mt-1.5">
+                  <Input
+                    value={generateShareLink(sharingTemplate)}
+                    readOnly
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => copyShareLink(sharingTemplate)}
+                  >
+                    {copiedLink ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2 text-green-500" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <p className="text-sm text-blue-600 dark:text-blue-400">
+                  <Share2 className="w-4 h-4 inline mr-1" />
+                  Anyone with this link can import this template to their collection.
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Import from Link Dialog */}
+      <Dialog open={importLinkDialogOpen} onOpenChange={setImportLinkDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-primary" />
+              Import Template from Link
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Paste Share Link</Label>
+              <Textarea
+                placeholder="Paste the template share link here..."
+                value={importLink}
+                onChange={(e) => setImportLink(e.target.value)}
+                className="font-mono text-xs min-h-[100px]"
+              />
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-sm text-muted-foreground">
+                <Link2 className="w-4 h-4 inline mr-1" />
+                Paste a template share link to import it to your custom templates collection.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => {
+                setImportLinkDialogOpen(false);
+                setImportLink("");
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={importFromLink} disabled={!importLink.trim()}>
+                <Download className="w-4 h-4 mr-2" />
+                Import Template
               </Button>
             </div>
           </div>
