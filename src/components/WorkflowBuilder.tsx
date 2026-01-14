@@ -6,7 +6,7 @@ import {
   Clock, Filter, Send, Database, Webhook, Save, RefreshCw,
   GitBranch, History, CheckCircle, XCircle, AlertCircle, RotateCcw,
   Download, Upload, Share2, Search, Eye, X, Sparkles, Users, 
-  Shield, BarChart3, Briefcase, Star, Copy, Pencil, Link2, Check
+  BarChart3, Briefcase, Star, Copy, Pencil, Link2, Check, GripVertical
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,8 +37,26 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { ar } from "date-fns/locale";
 import { ShareWorkflowDialog } from "@/components/ShareWorkflowDialog";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface WorkflowVariable {
   key: string;
@@ -90,6 +108,7 @@ const templateCategories: { id: TemplateCategory | "favorites" | "custom"; label
 interface CustomTemplate extends WorkflowTemplate {
   isCustom: true;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // Helper functions for localStorage
@@ -511,6 +530,135 @@ const dbToUiWorkflow = (dbWorkflow: DbWorkflow): Workflow => {
   };
 };
 
+// Sortable Template Item Component
+interface SortableTemplateItemProps {
+  template: CustomTemplate;
+  categoryInfo: { id: string; label: string; color: string } | undefined;
+  isFavorite: boolean;
+  onShare: (template: CustomTemplate, e?: React.MouseEvent) => void;
+  onEdit: (template: CustomTemplate, e?: React.MouseEvent) => void;
+  onDelete: (id: string, e?: React.MouseEvent) => void;
+  onPreview: (template: WorkflowTemplate) => void;
+  onCreate: (template: WorkflowTemplate) => void;
+}
+
+const SortableTemplateItem = ({
+  template,
+  categoryInfo,
+  onShare,
+  onEdit,
+  onDelete,
+  onPreview,
+  onCreate,
+}: SortableTemplateItemProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: template.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const lastModified = template.updatedAt || template.createdAt;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative flex items-start gap-3 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group ${
+        isDragging ? "opacity-50 shadow-lg z-50" : ""
+      }`}
+    >
+      {/* Drag Handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 left-2 p-1 rounded-full hover:bg-muted transition-colors cursor-grab active:cursor-grabbing"
+        title="Drag to reorder"
+      >
+        <GripVertical className="w-4 h-4 text-muted-foreground" />
+      </div>
+
+      {/* Action Buttons */}
+      <div className="absolute top-2 right-2 flex items-center gap-1">
+        <button
+          onClick={(e) => onShare(template, e)}
+          className="p-1 rounded-full hover:bg-muted transition-colors"
+          title="Share template via link"
+        >
+          <Link2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
+        </button>
+        <button
+          onClick={(e) => onEdit(template, e)}
+          className="p-1 rounded-full hover:bg-muted transition-colors"
+          title="Edit template"
+        >
+          <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary" />
+        </button>
+        <button
+          onClick={(e) => onDelete(template.id, e)}
+          className="p-1 rounded-full hover:bg-muted transition-colors"
+          title="Delete custom template"
+        >
+          <Trash2 className="w-4 h-4 text-destructive" />
+        </button>
+      </div>
+
+      <div className="p-2 rounded-lg bg-primary/10 ml-5">
+        <template.icon className="w-5 h-5 text-primary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h4 className="font-medium text-foreground truncate">{template.name}</h4>
+          <Badge variant="outline" className="text-[10px] h-5 text-cyan-500 border-cyan-500">
+            مخصص
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{template.description}</p>
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {categoryInfo && (
+            <Badge variant="outline" className={`text-[10px] h-5 ${categoryInfo.color}`}>
+              {categoryInfo.label}
+            </Badge>
+          )}
+          <Badge variant="secondary" className="text-[10px] h-5">
+            {template.nodes.length} nodes
+          </Badge>
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {formatDistanceToNow(new Date(lastModified), { addSuffix: true, locale: ar })}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mt-3">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs"
+            onClick={() => onPreview(template)}
+          >
+            <Eye className="w-3 h-3 mr-1" />
+            Preview
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => onCreate(template)}
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            Use
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const WorkflowBuilder = () => {
   const { user } = useAuth();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -547,7 +695,34 @@ export const WorkflowBuilder = () => {
   const [importLink, setImportLink] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Load favorites and custom templates on mount
+  // Drag and drop sensors for custom templates
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end for reordering custom templates
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      setCustomTemplates((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        saveCustomTemplates(newOrder);
+        return newOrder;
+      });
+      toast.success("Template order updated");
+    }
+  }, []);
   useEffect(() => {
     setFavoriteTemplatesState(getFavoriteTemplates());
     setCustomTemplates(getCustomTemplates());
@@ -601,6 +776,7 @@ export const WorkflowBuilder = () => {
               name: newTemplateName.trim(),
               description: newTemplateDescription.trim() || t.description,
               category: newTemplateCategory,
+              updatedAt: new Date().toISOString(),
             }
           : t
       );
@@ -1955,9 +2131,9 @@ export const WorkflowBuilder = () => {
                   </Card>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+                <div className="max-h-[50vh] overflow-y-auto pr-1">
                   {sortedTemplates.length === 0 ? (
-                    <div className="col-span-2 text-center py-12">
+                    <div className="text-center py-12">
                       <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                       <p className="text-muted-foreground">No templates found</p>
                       <p className="text-sm text-muted-foreground mt-1">
@@ -1968,103 +2144,145 @@ export const WorkflowBuilder = () => {
                           : "Try adjusting your search or filters"}
                       </p>
                     </div>
-                  ) : (
-                    sortedTemplates.map((template) => {
-                      const categoryInfo = templateCategories.find(c => c.id === template.category);
-                      const isFavorite = favoriteTemplates.includes(template.id);
-                      const isCustom = 'isCustom' in template;
-                      return (
-                        <div
-                          key={template.id}
-                          className="relative flex items-start gap-3 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
-                        >
-                          {/* Action Buttons for Custom Templates */}
-                          {isCustom ? (
-                            <div className="absolute top-2 right-2 flex items-center gap-1">
-                              <button
-                                onClick={(e) => openShareDialog(template as CustomTemplate, e)}
-                                className="p-1 rounded-full hover:bg-muted transition-colors"
-                                title="Share template via link"
-                              >
-                                <Link2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
-                              </button>
-                              <button
-                                onClick={(e) => openEditTemplateDialog(template as CustomTemplate, e)}
-                                className="p-1 rounded-full hover:bg-muted transition-colors"
-                                title="Edit template"
-                              >
-                                <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary" />
-                              </button>
-                              <button
-                                onClick={(e) => deleteCustomTemplate(template.id, e)}
-                                className="p-1 rounded-full hover:bg-muted transition-colors"
-                                title="Delete custom template"
-                              >
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={(e) => toggleFavorite(template.id, e)}
-                              className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted transition-colors"
-                              title={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                            >
-                              <Star className={`w-4 h-4 ${isFavorite ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`} />
-                            </button>
-                          )}
-
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <template.icon className="w-5 h-5 text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-medium text-foreground truncate">{template.name}</h4>
-                              {isCustom && (
-                                <Badge variant="outline" className="text-[10px] h-5 text-cyan-500 border-cyan-500">
-                                  مخصص
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{template.description}</p>
-                            <div className="flex items-center gap-2 mt-2 flex-wrap">
-                              {categoryInfo && (
-                                <Badge variant="outline" className={`text-[10px] h-5 ${categoryInfo.color}`}>
-                                  {categoryInfo.label}
-                                </Badge>
-                              )}
-                              <Badge variant="secondary" className="text-[10px] h-5">
-                                {template.nodes.length} nodes
-                              </Badge>
-                              {isFavorite && !isCustom && (
-                                <Badge variant="outline" className="text-[10px] h-5 text-yellow-500 border-yellow-500">
-                                  <Star className="w-3 h-3 mr-1 fill-current" />
-                                  مفضل
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 mt-3">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 text-xs"
-                                onClick={() => setPreviewTemplate(template)}
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                Preview
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => createFromTemplate(template)}
-                              >
-                                <Plus className="w-3 h-3 mr-1" />
-                                Use
-                              </Button>
-                            </div>
-                          </div>
+                  ) : selectedCategory === "custom" ? (
+                    // Drag and drop enabled for custom templates view
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={customTemplates.map(t => t.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {sortedTemplates.filter((t): t is CustomTemplate => 'isCustom' in t).map((template) => {
+                            const categoryInfo = templateCategories.find(c => c.id === template.category);
+                            return (
+                              <SortableTemplateItem
+                                key={template.id}
+                                template={template}
+                                categoryInfo={categoryInfo}
+                                isFavorite={false}
+                                onShare={openShareDialog}
+                                onEdit={openEditTemplateDialog}
+                                onDelete={deleteCustomTemplate}
+                                onPreview={setPreviewTemplate}
+                                onCreate={createFromTemplate}
+                              />
+                            );
+                          })}
                         </div>
-                      );
-                    })
+                      </SortableContext>
+                    </DndContext>
+                  ) : (
+                    // Regular grid for other views
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {sortedTemplates.map((template) => {
+                        const categoryInfo = templateCategories.find(c => c.id === template.category);
+                        const isFavorite = favoriteTemplates.includes(template.id);
+                        const isCustom = 'isCustom' in template;
+                        const lastModified = isCustom ? ((template as CustomTemplate).updatedAt || (template as CustomTemplate).createdAt) : null;
+                        
+                        return (
+                          <div
+                            key={template.id}
+                            className="relative flex items-start gap-3 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                          >
+                            {/* Action Buttons for Custom Templates */}
+                            {isCustom ? (
+                              <div className="absolute top-2 right-2 flex items-center gap-1">
+                                <button
+                                  onClick={(e) => openShareDialog(template as CustomTemplate, e)}
+                                  className="p-1 rounded-full hover:bg-muted transition-colors"
+                                  title="Share template via link"
+                                >
+                                  <Link2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                                </button>
+                                <button
+                                  onClick={(e) => openEditTemplateDialog(template as CustomTemplate, e)}
+                                  className="p-1 rounded-full hover:bg-muted transition-colors"
+                                  title="Edit template"
+                                >
+                                  <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                                </button>
+                                <button
+                                  onClick={(e) => deleteCustomTemplate(template.id, e)}
+                                  className="p-1 rounded-full hover:bg-muted transition-colors"
+                                  title="Delete custom template"
+                                >
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => toggleFavorite(template.id, e)}
+                                className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted transition-colors"
+                                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                              >
+                                <Star className={`w-4 h-4 ${isFavorite ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`} />
+                              </button>
+                            )}
+
+                            <div className="p-2 rounded-lg bg-primary/10">
+                              <template.icon className="w-5 h-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium text-foreground truncate">{template.name}</h4>
+                                {isCustom && (
+                                  <Badge variant="outline" className="text-[10px] h-5 text-cyan-500 border-cyan-500">
+                                    مخصص
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{template.description}</p>
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                {categoryInfo && (
+                                  <Badge variant="outline" className={`text-[10px] h-5 ${categoryInfo.color}`}>
+                                    {categoryInfo.label}
+                                  </Badge>
+                                )}
+                                <Badge variant="secondary" className="text-[10px] h-5">
+                                  {template.nodes.length} nodes
+                                </Badge>
+                                {isFavorite && !isCustom && (
+                                  <Badge variant="outline" className="text-[10px] h-5 text-yellow-500 border-yellow-500">
+                                    <Star className="w-3 h-3 mr-1 fill-current" />
+                                    مفضل
+                                  </Badge>
+                                )}
+                                {isCustom && lastModified && (
+                                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {formatDistanceToNow(new Date(lastModified), { addSuffix: true, locale: ar })}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-3">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs"
+                                  onClick={() => setPreviewTemplate(template)}
+                                >
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Preview
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => createFromTemplate(template)}
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Use
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               )}
