@@ -538,6 +538,8 @@ interface SortableTemplateItemProps {
   onShare: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onEdit: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onDelete: (id: string, e?: React.MouseEvent) => void;
+  onDuplicate: (template: CustomTemplate, e?: React.MouseEvent) => void;
+  onExportSingle: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onPreview: (template: WorkflowTemplate) => void;
   onCreate: (template: WorkflowTemplate) => void;
 }
@@ -548,6 +550,8 @@ const SortableTemplateItem = ({
   onShare,
   onEdit,
   onDelete,
+  onDuplicate,
+  onExportSingle,
   onPreview,
   onCreate,
 }: SortableTemplateItemProps) => {
@@ -587,6 +591,20 @@ const SortableTemplateItem = ({
 
       {/* Action Buttons */}
       <div className="absolute top-2 right-2 flex items-center gap-1">
+        <button
+          onClick={(e) => onExportSingle(template, e)}
+          className="p-1 rounded-full hover:bg-muted transition-colors"
+          title="Export this template"
+        >
+          <Download className="w-4 h-4 text-muted-foreground hover:text-primary" />
+        </button>
+        <button
+          onClick={(e) => onDuplicate(template, e)}
+          className="p-1 rounded-full hover:bg-muted transition-colors"
+          title="Duplicate template"
+        >
+          <Copy className="w-4 h-4 text-muted-foreground hover:text-primary" />
+        </button>
         <button
           onClick={(e) => onShare(template, e)}
           className="p-1 rounded-full hover:bg-muted transition-colors"
@@ -936,6 +954,53 @@ export const WorkflowBuilder = () => {
     URL.revokeObjectURL(url);
     toast.success(`Exported ${customTemplates.length} custom templates`);
   }, [customTemplates]);
+
+  // Export single custom template as JSON
+  const exportSingleTemplate = useCallback((template: CustomTemplate, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    
+    const exportData = {
+      version: "1.0",
+      type: "lovable_custom_templates",
+      exportedAt: new Date().toISOString(),
+      templates: [{ ...template, icon: undefined }],
+    };
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `template-${template.name.replace(/\s+/g, '-').toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported "${template.name}"`);
+  }, []);
+
+  // Duplicate custom template
+  const duplicateCustomTemplate = useCallback((template: CustomTemplate, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    
+    const duplicatedTemplate: CustomTemplate = {
+      ...template,
+      id: `custom-${Date.now()}`,
+      name: `${template.name} (نسخة)`,
+      icon: Sparkles,
+      isCustom: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: undefined,
+    };
+
+    setCustomTemplates(prev => {
+      const updated = [duplicatedTemplate, ...prev];
+      saveCustomTemplates(updated);
+      return updated;
+    });
+
+    toast.success(`Duplicated "${template.name}"`);
+  }, []);
 
   // Import custom templates from JSON
   const importCustomTemplates = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2167,6 +2232,8 @@ export const WorkflowBuilder = () => {
                                 onShare={openShareDialog}
                                 onEdit={openEditTemplateDialog}
                                 onDelete={deleteCustomTemplate}
+                                onDuplicate={duplicateCustomTemplate}
+                                onExportSingle={exportSingleTemplate}
                                 onPreview={setPreviewTemplate}
                                 onCreate={createFromTemplate}
                               />
@@ -2192,6 +2259,20 @@ export const WorkflowBuilder = () => {
                             {/* Action Buttons for Custom Templates */}
                             {isCustom ? (
                               <div className="absolute top-2 right-2 flex items-center gap-1">
+                                <button
+                                  onClick={(e) => exportSingleTemplate(template as CustomTemplate, e)}
+                                  className="p-1 rounded-full hover:bg-muted transition-colors"
+                                  title="Export this template"
+                                >
+                                  <Download className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                                </button>
+                                <button
+                                  onClick={(e) => duplicateCustomTemplate(template as CustomTemplate, e)}
+                                  className="p-1 rounded-full hover:bg-muted transition-colors"
+                                  title="Duplicate template"
+                                >
+                                  <Copy className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                                </button>
                                 <button
                                   onClick={(e) => openShareDialog(template as CustomTemplate, e)}
                                   className="p-1 rounded-full hover:bg-muted transition-colors"
