@@ -6,7 +6,8 @@ import {
   Clock, Filter, Send, Database, Webhook, Save, RefreshCw,
   GitBranch, History, CheckCircle, XCircle, AlertCircle, RotateCcw,
   Download, Upload, Share2, Search, Eye, X, Sparkles, Users, 
-  BarChart3, Briefcase, Star, Copy, Pencil, Link2, Check, GripVertical
+  BarChart3, Briefcase, Star, Copy, Pencil, Link2, Check, GripVertical,
+  Merge, CalendarDays
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -535,11 +536,13 @@ interface SortableTemplateItemProps {
   template: CustomTemplate;
   categoryInfo: { id: string; label: string; color: string } | undefined;
   isFavorite: boolean;
+  isSelectedForMerge: boolean;
   onShare: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onEdit: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onDelete: (id: string, e?: React.MouseEvent) => void;
   onDuplicate: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onExportSingle: (template: CustomTemplate, e?: React.MouseEvent) => void;
+  onToggleMerge: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onPreview: (template: WorkflowTemplate) => void;
   onCreate: (template: WorkflowTemplate) => void;
 }
@@ -547,11 +550,13 @@ interface SortableTemplateItemProps {
 const SortableTemplateItem = ({
   template,
   categoryInfo,
+  isSelectedForMerge,
   onShare,
   onEdit,
   onDelete,
   onDuplicate,
   onExportSingle,
+  onToggleMerge,
   onPreview,
   onCreate,
 }: SortableTemplateItemProps) => {
@@ -575,9 +580,9 @@ const SortableTemplateItem = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative flex items-start gap-3 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group ${
+      className={`relative flex items-start gap-3 p-4 rounded-lg border transition-all group ${
         isDragging ? "opacity-50 shadow-lg z-50" : ""
-      }`}
+      } ${isSelectedForMerge ? "border-violet-500 bg-violet-500/10" : "border-border hover:border-primary/50 hover:bg-primary/5"}`}
     >
       {/* Drag Handle */}
       <div
@@ -588,6 +593,17 @@ const SortableTemplateItem = ({
       >
         <GripVertical className="w-4 h-4 text-muted-foreground" />
       </div>
+
+      {/* Merge Selection Checkbox */}
+      <button
+        onClick={(e) => onToggleMerge(template, e)}
+        className={`absolute top-2 left-8 p-1 rounded-full transition-colors ${
+          isSelectedForMerge ? "bg-violet-500 text-white" : "hover:bg-muted"
+        }`}
+        title={isSelectedForMerge ? "إلغاء التحديد للدمج" : "تحديد للدمج"}
+      >
+        <Merge className="w-4 h-4" />
+      </button>
 
       {/* Action Buttons */}
       <div className="absolute top-2 right-2 flex items-center gap-1">
@@ -628,7 +644,7 @@ const SortableTemplateItem = ({
         </button>
       </div>
 
-      <div className="p-2 rounded-lg bg-primary/10 ml-5">
+      <div className="p-2 rounded-lg bg-primary/10 ml-12">
         <template.icon className="w-5 h-5 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
@@ -637,6 +653,11 @@ const SortableTemplateItem = ({
           <Badge variant="outline" className="text-[10px] h-5 text-cyan-500 border-cyan-500">
             مخصص
           </Badge>
+          {isSelectedForMerge && (
+            <Badge variant="outline" className="text-[10px] h-5 text-violet-500 border-violet-500">
+              للدمج
+            </Badge>
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{template.description}</p>
         <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -712,6 +733,17 @@ export const WorkflowBuilder = () => {
   const [importLinkDialogOpen, setImportLinkDialogOpen] = useState(false);
   const [importLink, setImportLink] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
+  
+  // Custom template search and filter states
+  const [customTemplateSearch, setCustomTemplateSearch] = useState("");
+  const [customDateFilter, setCustomDateFilter] = useState<"all" | "today" | "week" | "month">("all");
+  
+  // Merge templates states
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [selectedForMerge, setSelectedForMerge] = useState<CustomTemplate[]>([]);
+  const [mergeName, setMergeName] = useState("");
+  const [mergeDescription, setMergeDescription] = useState("");
+  const [mergeCategory, setMergeCategory] = useState<TemplateCategory>("automation");
 
   // Drag and drop sensors for custom templates
   const sensors = useSensors(
@@ -1079,6 +1111,117 @@ export const WorkflowBuilder = () => {
     setNewTemplateCategory("automation");
     toast.success("Workflow saved as custom template!");
   }, [selectedWorkflow, newTemplateName, newTemplateDescription, newTemplateCategory]);
+
+  // Toggle template selection for merge
+  const toggleMergeSelection = useCallback((template: CustomTemplate, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedForMerge(prev => {
+      if (prev.some(t => t.id === template.id)) {
+        return prev.filter(t => t.id !== template.id);
+      }
+      if (prev.length >= 2) {
+        toast.error("يمكنك اختيار قالبين فقط للدمج");
+        return prev;
+      }
+      return [...prev, template];
+    });
+  }, []);
+
+  // Merge two templates
+  const mergeTemplates = useCallback(() => {
+    if (selectedForMerge.length !== 2) {
+      toast.error("يرجى اختيار قالبين للدمج");
+      return;
+    }
+    if (!mergeName.trim()) {
+      toast.error("يرجى إدخال اسم للقالب المدمج");
+      return;
+    }
+
+    const [template1, template2] = selectedForMerge;
+    
+    // Combine nodes from both templates (avoiding duplicates by nodeType)
+    const combinedNodes = [...template1.nodes];
+    for (const node of template2.nodes) {
+      if (!combinedNodes.some(n => n.nodeType === node.nodeType && n.type === node.type)) {
+        combinedNodes.push(node);
+      }
+    }
+
+    // Combine conditions from both templates
+    const combinedConditions = [...template1.conditions, ...template2.conditions];
+
+    const mergedTemplate: CustomTemplate = {
+      id: `custom-${Date.now()}`,
+      name: mergeName.trim(),
+      description: mergeDescription.trim() || `Merged from: ${template1.name} + ${template2.name}`,
+      icon: Sparkles,
+      category: mergeCategory,
+      nodes: combinedNodes,
+      conditions: combinedConditions,
+      isCustom: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    setCustomTemplates(prev => {
+      const updated = [mergedTemplate, ...prev];
+      saveCustomTemplates(updated);
+      return updated;
+    });
+
+    setMergeDialogOpen(false);
+    setSelectedForMerge([]);
+    setMergeName("");
+    setMergeDescription("");
+    setMergeCategory("automation");
+    toast.success("تم دمج القوالب بنجاح!");
+  }, [selectedForMerge, mergeName, mergeDescription, mergeCategory]);
+
+  // Open merge dialog
+  const openMergeDialog = useCallback(() => {
+    if (selectedForMerge.length !== 2) {
+      toast.error("يرجى اختيار قالبين للدمج");
+      return;
+    }
+    setMergeName(`${selectedForMerge[0].name} + ${selectedForMerge[1].name}`);
+    setMergeDescription(`Merged workflow combining features from ${selectedForMerge[0].name} and ${selectedForMerge[1].name}`);
+    setMergeDialogOpen(true);
+  }, [selectedForMerge]);
+
+  // Filter custom templates with date
+  const filteredCustomTemplates = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - 7);
+    const startOfMonth = new Date(startOfToday);
+    startOfMonth.setDate(startOfMonth.getDate() - 30);
+
+    return customTemplates.filter(template => {
+      // Search filter
+      const matchesSearch = customTemplateSearch === "" ||
+        template.name.toLowerCase().includes(customTemplateSearch.toLowerCase()) ||
+        template.description.toLowerCase().includes(customTemplateSearch.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      // Date filter
+      if (customDateFilter === "all") return true;
+      
+      const templateDate = new Date(template.updatedAt || template.createdAt);
+      
+      switch (customDateFilter) {
+        case "today":
+          return templateDate >= startOfToday;
+        case "week":
+          return templateDate >= startOfWeek;
+        case "month":
+          return templateDate >= startOfMonth;
+        default:
+          return true;
+      }
+    });
+  }, [customTemplates, customTemplateSearch, customDateFilter]);
 
   // Filter templates based on search, category, and favorites
   const filteredTemplates = useMemo(() => {
@@ -2210,38 +2353,120 @@ export const WorkflowBuilder = () => {
                       </p>
                     </div>
                   ) : selectedCategory === "custom" ? (
-                    // Drag and drop enabled for custom templates view
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <SortableContext
-                        items={customTemplates.map(t => t.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {sortedTemplates.filter((t): t is CustomTemplate => 'isCustom' in t).map((template) => {
-                            const categoryInfo = templateCategories.find(c => c.id === template.category);
-                            return (
-                              <SortableTemplateItem
-                                key={template.id}
-                                template={template}
-                                categoryInfo={categoryInfo}
-                                isFavorite={false}
-                                onShare={openShareDialog}
-                                onEdit={openEditTemplateDialog}
-                                onDelete={deleteCustomTemplate}
-                                onDuplicate={duplicateCustomTemplate}
-                                onExportSingle={exportSingleTemplate}
-                                onPreview={setPreviewTemplate}
-                                onCreate={createFromTemplate}
-                              />
-                            );
-                          })}
+                    // Enhanced custom templates view with search, date filter, and merge
+                    <div className="space-y-4">
+                      {/* Custom Templates Search and Date Filter */}
+                      <div className="flex flex-wrap gap-2">
+                        <div className="relative flex-1 min-w-[200px]">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            placeholder="بحث في القوالب المخصصة..."
+                            value={customTemplateSearch}
+                            onChange={(e) => setCustomTemplateSearch(e.target.value)}
+                            className="pl-10"
+                          />
+                          {customTemplateSearch && (
+                            <button
+                              onClick={() => setCustomTemplateSearch("")}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
-                      </SortableContext>
-                    </DndContext>
+                        
+                        {/* Date Filter */}
+                        <Select
+                          value={customDateFilter}
+                          onValueChange={(value) => setCustomDateFilter(value as "all" | "today" | "week" | "month")}
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            <CalendarDays className="w-4 h-4 mr-2" />
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">جميع الأوقات</SelectItem>
+                            <SelectItem value="today">اليوم</SelectItem>
+                            <SelectItem value="week">آخر أسبوع</SelectItem>
+                            <SelectItem value="month">آخر شهر</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {/* Merge Button */}
+                        {selectedForMerge.length > 0 && (
+                          <Button
+                            variant={selectedForMerge.length === 2 ? "default" : "outline"}
+                            size="sm"
+                            onClick={openMergeDialog}
+                            disabled={selectedForMerge.length !== 2}
+                            className="gap-2"
+                          >
+                            <Merge className="w-4 h-4" />
+                            دمج ({selectedForMerge.length}/2)
+                          </Button>
+                        )}
+                        
+                        {selectedForMerge.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedForMerge([])}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            إلغاء التحديد
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Results count */}
+                      <div className="text-xs text-muted-foreground">
+                        {filteredCustomTemplates.length} من {customTemplates.length} قالب
+                      </div>
+
+                      {/* Drag and drop enabled for custom templates view */}
+                      {filteredCustomTemplates.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Search className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                          <p className="text-muted-foreground">لا توجد نتائج</p>
+                          <p className="text-sm text-muted-foreground mt-1">جرب تغيير كلمات البحث أو فلتر التاريخ</p>
+                        </div>
+                      ) : (
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <SortableContext
+                            items={filteredCustomTemplates.map(t => t.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {filteredCustomTemplates.map((template) => {
+                                const categoryInfo = templateCategories.find(c => c.id === template.category);
+                                const isSelectedForMergeTemplate = selectedForMerge.some(t => t.id === template.id);
+                                return (
+                                  <SortableTemplateItem
+                                    key={template.id}
+                                    template={template}
+                                    categoryInfo={categoryInfo}
+                                    isFavorite={false}
+                                    isSelectedForMerge={isSelectedForMergeTemplate}
+                                    onShare={openShareDialog}
+                                    onEdit={openEditTemplateDialog}
+                                    onDelete={deleteCustomTemplate}
+                                    onDuplicate={duplicateCustomTemplate}
+                                    onExportSingle={exportSingleTemplate}
+                                    onToggleMerge={toggleMergeSelection}
+                                    onPreview={setPreviewTemplate}
+                                    onCreate={createFromTemplate}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+                      )}
+                    </div>
                   ) : (
                     // Regular grid for other views
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -3310,6 +3535,122 @@ export const WorkflowBuilder = () => {
               <Button onClick={importFromLink} disabled={!importLink.trim()}>
                 <Download className="w-4 h-4 mr-2" />
                 Import Template
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Merge Templates Dialog */}
+      <Dialog open={mergeDialogOpen} onOpenChange={(open) => {
+        setMergeDialogOpen(open);
+        if (!open) {
+          setMergeName("");
+          setMergeDescription("");
+          setMergeCategory("automation");
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Merge className="w-5 h-5 text-violet-500" />
+              دمج قالبين مخصصين
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Selected Templates Preview */}
+            <div className="space-y-2">
+              <Label>القوالب المختارة للدمج</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {selectedForMerge.map((template) => (
+                  <div key={template.id} className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/30">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-violet-500" />
+                      <span className="text-sm font-medium truncate">{template.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                      <Badge variant="secondary" className="text-[10px] h-4">
+                        {template.nodes.length} nodes
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px] h-4">
+                        {template.conditions.length} conditions
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label>اسم القالب المدمج</Label>
+              <Input
+                placeholder="أدخل اسم القالب الجديد..."
+                value={mergeName}
+                onChange={(e) => setMergeName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>الوصف</Label>
+              <Textarea
+                placeholder="وصف القالب المدمج..."
+                value={mergeDescription}
+                onChange={(e) => setMergeDescription(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>الفئة</Label>
+              <Select
+                value={mergeCategory}
+                onValueChange={(value) => setMergeCategory(value as TemplateCategory)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="automation">أتمتة (Automation)</SelectItem>
+                  <SelectItem value="communication">تواصل (Communication)</SelectItem>
+                  <SelectItem value="data">بيانات (Data)</SelectItem>
+                  <SelectItem value="productivity">إنتاجية (Productivity)</SelectItem>
+                  <SelectItem value="customer">عملاء (Customer)</SelectItem>
+                  <SelectItem value="hr">موارد بشرية (HR)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Merge Preview */}
+            {selectedForMerge.length === 2 && (
+              <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                <p className="text-sm text-muted-foreground">
+                  <Merge className="w-4 h-4 inline mr-1 text-violet-500" />
+                  سيتم إنشاء قالب جديد يحتوي على{" "}
+                  <strong>
+                    {(() => {
+                      const [t1, t2] = selectedForMerge;
+                      const combinedNodes = [...t1.nodes];
+                      for (const node of t2.nodes) {
+                        if (!combinedNodes.some(n => n.nodeType === node.nodeType && n.type === node.type)) {
+                          combinedNodes.push(node);
+                        }
+                      }
+                      return combinedNodes.length;
+                    })()}
+                  </strong>{" "}
+                  nodes و{" "}
+                  <strong>
+                    {selectedForMerge[0].conditions.length + selectedForMerge[1].conditions.length}
+                  </strong>{" "}
+                  conditions
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setMergeDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button onClick={mergeTemplates} disabled={!mergeName.trim()}>
+                <Merge className="w-4 h-4 mr-2" />
+                دمج القوالب
               </Button>
             </div>
           </div>
