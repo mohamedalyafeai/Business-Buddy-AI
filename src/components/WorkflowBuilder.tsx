@@ -763,6 +763,17 @@ export const WorkflowBuilder = () => {
   
   // AI categorization state
   const [categorizingTemplateId, setCategorizingTemplateId] = useState<string | null>(null);
+  const [isBulkCategorizing, setIsBulkCategorizing] = useState(false);
+  const [bulkCategorizeProgress, setBulkCategorizeProgress] = useState({ current: 0, total: 0 });
+
+  // Import from external services state
+  const [importExternalDialogOpen, setImportExternalDialogOpen] = useState(false);
+  const [externalServiceType, setExternalServiceType] = useState<"zapier" | "make">("zapier");
+  const [zapierWebhookUrl, setZapierWebhookUrl] = useState("");
+  const [makeWebhookUrl, setMakeWebhookUrl] = useState("");
+  const [externalTemplateName, setExternalTemplateName] = useState("");
+  const [externalTemplateDescription, setExternalTemplateDescription] = useState("");
+  const [isImportingExternal, setIsImportingExternal] = useState(false);
 
   // Drag and drop sensors for custom templates
   const sensors = useSensors(
@@ -1250,6 +1261,145 @@ export const WorkflowBuilder = () => {
       setCategorizingTemplateId(null);
     }
   }, [categorizingTemplateId]);
+
+  // Bulk AI categorize all templates
+  const bulkAICategorize = useCallback(async () => {
+    if (customTemplates.length === 0) {
+      toast.error("لا توجد قوالب مخصصة للتصنيف");
+      return;
+    }
+
+    setIsBulkCategorizing(true);
+    setBulkCategorizeProgress({ current: 0, total: customTemplates.length });
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < customTemplates.length; i++) {
+      const template = customTemplates[i];
+      setBulkCategorizeProgress({ current: i + 1, total: customTemplates.length });
+
+      try {
+        const response = await supabase.functions.invoke('categorize-template', {
+          body: { template }
+        });
+
+        if (response.error) {
+          errorCount++;
+          continue;
+        }
+
+        const { category } = response.data;
+        
+        if (category) {
+          setCustomTemplates(prev => {
+            const updated = prev.map(t =>
+              t.id === template.id
+                ? { ...t, category: category as TemplateCategory, updatedAt: new Date().toISOString() }
+                : t
+            );
+            saveCustomTemplates(updated);
+            return updated;
+          });
+          successCount++;
+        }
+
+        // Add delay to avoid rate limiting
+        if (i < customTemplates.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        console.error('Error categorizing template:', template.name, error);
+        errorCount++;
+      }
+    }
+
+    setIsBulkCategorizing(false);
+    setBulkCategorizeProgress({ current: 0, total: 0 });
+
+    if (successCount > 0) {
+      toast.success(`تم تصنيف ${successCount} قالب بنجاح`);
+    }
+    if (errorCount > 0) {
+      toast.error(`فشل تصنيف ${errorCount} قالب`);
+    }
+  }, [customTemplates]);
+
+  // Import from external services (Zapier/Make)
+  const importFromExternalService = useCallback(() => {
+    if (!externalTemplateName.trim()) {
+      toast.error("يرجى إدخال اسم القالب");
+      return;
+    }
+
+    const webhookUrl = externalServiceType === "zapier" ? zapierWebhookUrl : makeWebhookUrl;
+    
+    if (!webhookUrl.trim()) {
+      toast.error(`يرجى إدخال رابط Webhook الخاص بـ ${externalServiceType === "zapier" ? "Zapier" : "Make"}`);
+      return;
+    }
+
+    setIsImportingExternal(true);
+
+    try {
+      // Create a template with webhook trigger for external service
+      const newTemplate: CustomTemplate = {
+        id: `custom-${Date.now()}`,
+        name: externalTemplateName.trim(),
+        description: externalTemplateDescription.trim() || `قالب مستورد من ${externalServiceType === "zapier" ? "Zapier" : "Make"}`,
+        icon: Sparkles,
+        category: "automation",
+        nodes: [
+          {
+            type: "trigger" as const,
+            nodeType: "webhook",
+            config: { 
+              webhookUrl: webhookUrl.trim(),
+              service: externalServiceType,
+              description: `${externalServiceType === "zapier" ? "Zapier" : "Make"} Webhook Integration`
+            },
+            label: `${externalServiceType === "zapier" ? "Zapier" : "Make"} Webhook`
+          },
+          {
+            type: "ai" as const,
+            nodeType: "ai_analyze",
+            config: { 
+              prompt: "Analyze incoming data from external automation service and extract key information."
+            },
+            label: "AI Analyze"
+          },
+          {
+            type: "action" as const,
+            nodeType: "save_data",
+            config: {},
+            label: "Save Data"
+          }
+        ],
+        conditions: [],
+        isCustom: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      setCustomTemplates(prev => {
+        const updated = [newTemplate, ...prev];
+        saveCustomTemplates(updated);
+        return updated;
+      });
+
+      setImportExternalDialogOpen(false);
+      setExternalTemplateName("");
+      setExternalTemplateDescription("");
+      setZapierWebhookUrl("");
+      setMakeWebhookUrl("");
+      
+      toast.success(`تم استيراد القالب من ${externalServiceType === "zapier" ? "Zapier" : "Make"} بنجاح!`);
+    } catch (error) {
+      console.error("Error importing from external service:", error);
+      toast.error("فشل استيراد القالب");
+    } finally {
+      setIsImportingExternal(false);
+    }
+  }, [externalServiceType, externalTemplateName, externalTemplateDescription, zapierWebhookUrl, makeWebhookUrl]);
 
   // Filter custom templates with date
   const filteredCustomTemplates = useMemo(() => {
@@ -2454,6 +2604,42 @@ export const WorkflowBuilder = () => {
                             <SelectItem value="month">آخر شهر</SelectItem>
                           </SelectContent>
                         </Select>
+
+                        {/* Bulk AI Categorize Button */}
+                        {customTemplates.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={bulkAICategorize}
+                            disabled={isBulkCategorizing}
+                            className="gap-2"
+                            title="تصنيف جميع القوالب تلقائياً بالذكاء الاصطناعي"
+                          >
+                            {isBulkCategorizing ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                {bulkCategorizeProgress.current}/{bulkCategorizeProgress.total}
+                              </>
+                            ) : (
+                              <>
+                                <Bot className="w-4 h-4 text-violet-500" />
+                                تصنيف الكل
+                              </>
+                            )}
+                          </Button>
+                        )}
+
+                        {/* Import from External Services Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setImportExternalDialogOpen(true)}
+                          className="gap-2"
+                          title="استيراد من Zapier أو Make"
+                        >
+                          <Zap className="w-4 h-4 text-orange-500" />
+                          استيراد خارجي
+                        </Button>
 
                         {/* Merge Button */}
                         {selectedForMerge.length > 0 && (
@@ -3728,6 +3914,136 @@ export const WorkflowBuilder = () => {
               <Button onClick={mergeTemplates} disabled={!mergeName.trim()}>
                 <Merge className="w-4 h-4 mr-2" />
                 دمج القوالب
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import from External Services Dialog */}
+      <Dialog open={importExternalDialogOpen} onOpenChange={(open) => {
+        setImportExternalDialogOpen(open);
+        if (!open) {
+          setExternalTemplateName("");
+          setExternalTemplateDescription("");
+          setZapierWebhookUrl("");
+          setMakeWebhookUrl("");
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-orange-500" />
+              استيراد من خدمات خارجية
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Service Selection */}
+            <div>
+              <Label>اختر الخدمة</Label>
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <button
+                  onClick={() => setExternalServiceType("zapier")}
+                  className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
+                    externalServiceType === "zapier"
+                      ? "border-orange-500 bg-orange-500/10"
+                      : "border-border hover:border-orange-500/50"
+                  }`}
+                >
+                  <div className="p-2 rounded-lg bg-orange-500/10">
+                    <Zap className="w-6 h-6 text-orange-500" />
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">Zapier</p>
+                    <p className="text-xs text-muted-foreground">أتمتة سير العمل</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setExternalServiceType("make")}
+                  className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
+                    externalServiceType === "make"
+                      ? "border-violet-500 bg-violet-500/10"
+                      : "border-border hover:border-violet-500/50"
+                  }`}
+                >
+                  <div className="p-2 rounded-lg bg-violet-500/10">
+                    <GitBranch className="w-6 h-6 text-violet-500" />
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">Make</p>
+                    <p className="text-xs text-muted-foreground">سيناريوهات معقدة</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Template Name */}
+            <div>
+              <Label>اسم القالب *</Label>
+              <Input
+                placeholder="أدخل اسم القالب..."
+                value={externalTemplateName}
+                onChange={(e) => setExternalTemplateName(e.target.value)}
+              />
+            </div>
+
+            {/* Template Description */}
+            <div>
+              <Label>الوصف</Label>
+              <Textarea
+                placeholder="وصف القالب..."
+                value={externalTemplateDescription}
+                onChange={(e) => setExternalTemplateDescription(e.target.value)}
+              />
+            </div>
+
+            {/* Webhook URL */}
+            <div>
+              <Label>
+                رابط Webhook الخاص بـ {externalServiceType === "zapier" ? "Zapier" : "Make"} *
+              </Label>
+              <Input
+                placeholder={`https://hooks.${externalServiceType === "zapier" ? "zapier.com" : "make.com"}/...`}
+                value={externalServiceType === "zapier" ? zapierWebhookUrl : makeWebhookUrl}
+                onChange={(e) => {
+                  if (externalServiceType === "zapier") {
+                    setZapierWebhookUrl(e.target.value);
+                  } else {
+                    setMakeWebhookUrl(e.target.value);
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {externalServiceType === "zapier" 
+                  ? "يمكنك الحصول على رابط Webhook من تطبيق Zapier عند إنشاء Zap جديد مع Webhooks by Zapier"
+                  : "يمكنك الحصول على رابط Webhook من سيناريو Make عند إضافة Webhook module"
+                }
+              </p>
+            </div>
+
+            {/* Instructions */}
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-sm text-muted-foreground">
+                <Zap className="w-4 h-4 inline mr-1 text-orange-500" />
+                سيتم إنشاء قالب سير عمل جديد مع trigger من نوع Webhook متصل بـ {externalServiceType === "zapier" ? "Zapier" : "Make"}. 
+                يمكنك تخصيص القالب وإضافة المزيد من الخطوات لاحقاً.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setImportExternalDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button 
+                onClick={importFromExternalService} 
+                disabled={!externalTemplateName.trim() || !(externalServiceType === "zapier" ? zapierWebhookUrl : makeWebhookUrl).trim() || isImportingExternal}
+              >
+                {isImportingExternal ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                استيراد القالب
               </Button>
             </div>
           </div>
