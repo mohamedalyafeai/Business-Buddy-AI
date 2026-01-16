@@ -537,12 +537,14 @@ interface SortableTemplateItemProps {
   categoryInfo: { id: string; label: string; color: string } | undefined;
   isFavorite: boolean;
   isSelectedForMerge: boolean;
+  isCategorizingAI?: boolean;
   onShare: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onEdit: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onDelete: (id: string, e?: React.MouseEvent) => void;
   onDuplicate: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onExportSingle: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onToggleMerge: (template: CustomTemplate, e?: React.MouseEvent) => void;
+  onAICategorize: (template: CustomTemplate, e?: React.MouseEvent) => void;
   onPreview: (template: WorkflowTemplate) => void;
   onCreate: (template: WorkflowTemplate) => void;
 }
@@ -551,12 +553,14 @@ const SortableTemplateItem = ({
   template,
   categoryInfo,
   isSelectedForMerge,
+  isCategorizingAI,
   onShare,
   onEdit,
   onDelete,
   onDuplicate,
   onExportSingle,
   onToggleMerge,
+  onAICategorize,
   onPreview,
   onCreate,
 }: SortableTemplateItemProps) => {
@@ -607,6 +611,18 @@ const SortableTemplateItem = ({
 
       {/* Action Buttons */}
       <div className="absolute top-2 right-2 flex items-center gap-1">
+        <button
+          onClick={(e) => onAICategorize(template, e)}
+          className={`p-1 rounded-full hover:bg-muted transition-colors ${isCategorizingAI ? 'animate-pulse' : ''}`}
+          title="تصنيف تلقائي بالذكاء الاصطناعي"
+          disabled={isCategorizingAI}
+        >
+          {isCategorizingAI ? (
+            <Loader2 className="w-4 h-4 text-violet-500 animate-spin" />
+          ) : (
+            <Bot className="w-4 h-4 text-violet-500 hover:text-violet-600" />
+          )}
+        </button>
         <button
           onClick={(e) => onExportSingle(template, e)}
           className="p-1 rounded-full hover:bg-muted transition-colors"
@@ -744,6 +760,9 @@ export const WorkflowBuilder = () => {
   const [mergeName, setMergeName] = useState("");
   const [mergeDescription, setMergeDescription] = useState("");
   const [mergeCategory, setMergeCategory] = useState<TemplateCategory>("automation");
+  
+  // AI categorization state
+  const [categorizingTemplateId, setCategorizingTemplateId] = useState<string | null>(null);
 
   // Drag and drop sensors for custom templates
   const sensors = useSensors(
@@ -1187,6 +1206,50 @@ export const WorkflowBuilder = () => {
     setMergeDescription(`Merged workflow combining features from ${selectedForMerge[0].name} and ${selectedForMerge[1].name}`);
     setMergeDialogOpen(true);
   }, [selectedForMerge]);
+
+  // AI Categorize template
+  const aiCategorizeTemplate = useCallback(async (template: CustomTemplate, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    
+    if (categorizingTemplateId) {
+      toast.error("يتم تصنيف قالب آخر حالياً");
+      return;
+    }
+
+    setCategorizingTemplateId(template.id);
+    
+    try {
+      const response = await supabase.functions.invoke('categorize-template', {
+        body: { template }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'فشل في تصنيف القالب');
+      }
+
+      const { category } = response.data;
+      
+      if (category) {
+        setCustomTemplates(prev => {
+          const updated = prev.map(t =>
+            t.id === template.id
+              ? { ...t, category: category as TemplateCategory, updatedAt: new Date().toISOString() }
+              : t
+          );
+          saveCustomTemplates(updated);
+          return updated;
+        });
+
+        const categoryLabel = templateCategories.find(c => c.id === category)?.label || category;
+        toast.success(`تم تصنيف القالب: ${categoryLabel}`);
+      }
+    } catch (error) {
+      console.error('Error categorizing template:', error);
+      toast.error(error instanceof Error ? error.message : 'فشل في تصنيف القالب');
+    } finally {
+      setCategorizingTemplateId(null);
+    }
+  }, [categorizingTemplateId]);
 
   // Filter custom templates with date
   const filteredCustomTemplates = useMemo(() => {
@@ -2451,12 +2514,14 @@ export const WorkflowBuilder = () => {
                                     categoryInfo={categoryInfo}
                                     isFavorite={false}
                                     isSelectedForMerge={isSelectedForMergeTemplate}
+                                    isCategorizingAI={categorizingTemplateId === template.id}
                                     onShare={openShareDialog}
                                     onEdit={openEditTemplateDialog}
                                     onDelete={deleteCustomTemplate}
                                     onDuplicate={duplicateCustomTemplate}
                                     onExportSingle={exportSingleTemplate}
                                     onToggleMerge={toggleMergeSelection}
+                                    onAICategorize={aiCategorizeTemplate}
                                     onPreview={setPreviewTemplate}
                                     onCreate={createFromTemplate}
                                   />
@@ -2484,6 +2549,18 @@ export const WorkflowBuilder = () => {
                             {/* Action Buttons for Custom Templates */}
                             {isCustom ? (
                               <div className="absolute top-2 right-2 flex items-center gap-1">
+                                <button
+                                  onClick={(e) => aiCategorizeTemplate(template as CustomTemplate, e)}
+                                  className={`p-1 rounded-full hover:bg-muted transition-colors ${categorizingTemplateId === template.id ? 'animate-pulse' : ''}`}
+                                  title="تصنيف تلقائي بالذكاء الاصطناعي"
+                                  disabled={categorizingTemplateId === template.id}
+                                >
+                                  {categorizingTemplateId === template.id ? (
+                                    <Loader2 className="w-4 h-4 text-violet-500 animate-spin" />
+                                  ) : (
+                                    <Bot className="w-4 h-4 text-violet-500 hover:text-violet-600" />
+                                  )}
+                                </button>
                                 <button
                                   onClick={(e) => exportSingleTemplate(template as CustomTemplate, e)}
                                   className="p-1 rounded-full hover:bg-muted transition-colors"
