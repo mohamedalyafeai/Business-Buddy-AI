@@ -106,6 +106,48 @@ export type Database = {
           },
         ]
       }
+      custom_templates: {
+        Row: {
+          category: string
+          conditions: Json
+          created_at: string
+          description: string | null
+          external_service: string | null
+          id: string
+          name: string
+          nodes: Json
+          updated_at: string
+          user_id: string
+          webhook_url: string | null
+        }
+        Insert: {
+          category?: string
+          conditions?: Json
+          created_at?: string
+          description?: string | null
+          external_service?: string | null
+          id?: string
+          name: string
+          nodes?: Json
+          updated_at?: string
+          user_id: string
+          webhook_url?: string | null
+        }
+        Update: {
+          category?: string
+          conditions?: Json
+          created_at?: string
+          description?: string | null
+          external_service?: string | null
+          id?: string
+          name?: string
+          nodes?: Json
+          updated_at?: string
+          user_id?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
