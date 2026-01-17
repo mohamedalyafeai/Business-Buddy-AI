@@ -774,6 +774,17 @@ export const WorkflowBuilder = () => {
   const [externalTemplateName, setExternalTemplateName] = useState("");
   const [externalTemplateDescription, setExternalTemplateDescription] = useState("");
   const [isImportingExternal, setIsImportingExternal] = useState(false);
+  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
+  const [webhookTestResult, setWebhookTestResult] = useState<"success" | "error" | null>(null);
+  
+  // Database sync state
+  const [isSyncingTemplates, setIsSyncingTemplates] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  
+  // Export format dialog state
+  const [exportFormatDialogOpen, setExportFormatDialogOpen] = useState(false);
+  const [exportingTemplate, setExportingTemplate] = useState<CustomTemplate | null>(null);
+  const [exportFormat, setExportFormat] = useState<"json" | "zapier" | "make">("json");
 
   // Drag and drop sensors for custom templates
   const sensors = useSensors(
@@ -1325,6 +1336,338 @@ export const WorkflowBuilder = () => {
     }
   }, [customTemplates]);
 
+  // Test webhook connection
+  const testWebhookConnection = useCallback(async () => {
+    const webhookUrl = externalServiceType === "zapier" ? zapierWebhookUrl : makeWebhookUrl;
+    
+    if (!webhookUrl.trim()) {
+      toast.error(`يرجى إدخال رابط Webhook الخاص بـ ${externalServiceType === "zapier" ? "Zapier" : "Make"}`);
+      return;
+    }
+
+    setIsTestingWebhook(true);
+    setWebhookTestResult(null);
+
+    try {
+      const response = await fetch(webhookUrl.trim(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        mode: "no-cors",
+        body: JSON.stringify({
+          test: true,
+          timestamp: new Date().toISOString(),
+          triggered_from: window.location.origin,
+          message: "Test connection from Lovable Workflow Builder"
+        }),
+      });
+
+      // Since we're using no-cors, we can't check response status
+      // But if no error was thrown, the request was sent
+      setWebhookTestResult("success");
+      toast.success("تم إرسال اختبار الاتصال بنجاح! تحقق من سجل Webhook في الخدمة الخارجية.");
+    } catch (error) {
+      console.error("Error testing webhook:", error);
+      setWebhookTestResult("error");
+      toast.error("فشل اختبار الاتصال. تحقق من صحة رابط Webhook.");
+    } finally {
+      setIsTestingWebhook(false);
+    }
+  }, [externalServiceType, zapierWebhookUrl, makeWebhookUrl]);
+
+  // Sync templates to database
+  const syncTemplatesToDatabase = useCallback(async () => {
+    if (!user) {
+      toast.error("يرجى تسجيل الدخول لمزامنة القوالب");
+      return;
+    }
+
+    setIsSyncingTemplates(true);
+
+    try {
+      // Fetch existing templates from database
+      const { data: dbTemplates, error: fetchError } = await supabase
+        .from('custom_templates')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (fetchError) throw fetchError;
+
+      // Get local templates
+      const localTemplates = customTemplates;
+
+      // Merge strategy: local templates take priority
+      const dbTemplateIds = new Set((dbTemplates || []).map(t => t.id));
+      const localTemplateIds = new Set(localTemplates.map(t => t.id));
+
+      // Templates to insert (local only)
+      const toInsert = localTemplates.filter(t => !dbTemplateIds.has(t.id));
+      
+      // Templates to update (exist in both)
+      const toUpdate = localTemplates.filter(t => dbTemplateIds.has(t.id));
+
+      // Insert new templates
+      if (toInsert.length > 0) {
+        const insertData = toInsert.map(t => ({
+          id: t.id.startsWith('custom-') ? undefined : t.id, // Let DB generate new IDs for local-only templates
+          user_id: user.id,
+          name: t.name,
+          description: t.description,
+          category: t.category,
+          nodes: t.nodes,
+          conditions: t.conditions,
+          created_at: t.createdAt,
+          updated_at: t.updatedAt || t.createdAt,
+        }));
+
+        const { error: insertError } = await supabase
+          .from('custom_templates')
+          .insert(insertData);
+
+        if (insertError) throw insertError;
+      }
+
+      // Update existing templates
+      for (const template of toUpdate) {
+        const { error: updateError } = await supabase
+          .from('custom_templates')
+          .update({
+            name: template.name,
+            description: template.description,
+            category: template.category,
+            nodes: template.nodes,
+            conditions: template.conditions,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', template.id)
+          .eq('user_id', user.id);
+
+        if (updateError) throw updateError;
+      }
+
+      // Fetch updated templates from database and merge with local
+      const { data: updatedDbTemplates, error: refetchError } = await supabase
+        .from('custom_templates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (refetchError) throw refetchError;
+
+      // Convert DB templates to CustomTemplate format
+      const syncedTemplates: CustomTemplate[] = (updatedDbTemplates || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description || '',
+        icon: Sparkles,
+        category: (t.category as TemplateCategory) || 'automation',
+        nodes: (t.nodes as unknown as Omit<WorkflowNode, "id">[]) || [],
+        conditions: (t.conditions as unknown as Omit<Condition, "id">[]) || [],
+        isCustom: true as const,
+        createdAt: t.created_at,
+        updatedAt: t.updated_at,
+      }));
+
+      setCustomTemplates(syncedTemplates);
+      saveCustomTemplates(syncedTemplates);
+      setLastSyncTime(new Date().toISOString());
+      
+      toast.success(`تمت مزامنة ${syncedTemplates.length} قالب بنجاح`);
+    } catch (error) {
+      console.error('Error syncing templates:', error);
+      toast.error('فشلت مزامنة القوالب');
+    } finally {
+      setIsSyncingTemplates(false);
+    }
+  }, [user, customTemplates]);
+
+  // Load templates from database on mount
+  const loadTemplatesFromDatabase = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data: dbTemplates, error } = await supabase
+        .from('custom_templates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (dbTemplates && dbTemplates.length > 0) {
+        const loadedTemplates: CustomTemplate[] = dbTemplates.map(t => ({
+          id: t.id,
+          name: t.name,
+          description: t.description || '',
+          icon: Sparkles,
+          category: (t.category as TemplateCategory) || 'automation',
+          nodes: (t.nodes as unknown as Omit<WorkflowNode, "id">[]) || [],
+          conditions: (t.conditions as unknown as Omit<Condition, "id">[]) || [],
+          isCustom: true as const,
+          createdAt: t.created_at,
+          updatedAt: t.updated_at,
+        }));
+
+        // Merge with local templates (prefer newer versions)
+        const localTemplates = getCustomTemplates();
+        const mergedMap = new Map<string, CustomTemplate>();
+
+        // Add DB templates first
+        loadedTemplates.forEach(t => mergedMap.set(t.id, t));
+
+        // Override with local templates that are newer
+        localTemplates.forEach(t => {
+          const existing = mergedMap.get(t.id);
+          if (!existing || new Date(t.updatedAt || t.createdAt) > new Date(existing.updatedAt || existing.createdAt)) {
+            mergedMap.set(t.id, t);
+          }
+        });
+
+        const merged = Array.from(mergedMap.values()).sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        setCustomTemplates(merged);
+        saveCustomTemplates(merged);
+        setLastSyncTime(new Date().toISOString());
+      }
+    } catch (error) {
+      console.error('Error loading templates from database:', error);
+    }
+  }, [user]);
+
+  // Load templates from database when user logs in
+  useEffect(() => {
+    if (user) {
+      loadTemplatesFromDatabase();
+    }
+  }, [user, loadTemplatesFromDatabase]);
+
+  // Export template in different formats
+  const exportTemplateInFormat = useCallback((template: CustomTemplate, exportType: "json" | "zapier" | "make") => {
+    let exportData: object;
+    let filename: string;
+    let fileExtension: string;
+
+    if (exportType === "zapier") {
+      // Zapier Blueprint format
+      exportData = {
+        name: template.name,
+        description: template.description,
+        version: "1.0",
+        type: "zapier_blueprint",
+        exported_at: new Date().toISOString(),
+        zap: {
+          name: template.name,
+          steps: template.nodes.map((node, index) => ({
+            id: index + 1,
+            title: node.label,
+            type: node.type === "trigger" ? "trigger" : "action",
+            app: node.type === "ai" ? "code" : node.nodeType,
+            action: node.nodeType,
+            params: node.config,
+            notes: node.type === "ai" ? "AI-powered step - requires Code by Zapier or similar" : undefined,
+          })),
+          conditions: template.conditions.map((c, index) => ({
+            id: index + 1,
+            type: "filter",
+            field: c.field,
+            operator: c.operator,
+            value: c.value,
+            on_match: c.thenAction,
+            on_fail: c.elseAction,
+          })),
+        },
+        integration_notes: [
+          "This blueprint was exported from Lovable Workflow Builder.",
+          "AI nodes require Code by Zapier or integration with an AI service.",
+          "Webhook triggers should be configured with Webhooks by Zapier.",
+          "Review and adjust each step configuration in the Zapier editor."
+        ],
+      };
+      filename = `zapier-blueprint-${template.name.replace(/\s+/g, '-').toLowerCase()}`;
+      fileExtension = "json";
+    } else if (exportType === "make") {
+      // Make (Integromat) Scenario format
+      exportData = {
+        name: template.name,
+        description: template.description,
+        version: "1.0",
+        type: "make_scenario",
+        exported_at: new Date().toISOString(),
+        scenario: {
+          name: template.name,
+          flow: template.nodes.map((node, index) => ({
+            id: index + 1,
+            module: node.type === "trigger" ? "gateway:CustomWebHook" :
+                    node.type === "ai" ? "openai:CreateChatCompletion" :
+                    node.nodeType === "send_email" ? "email:ActionSendMail" :
+                    node.nodeType === "save_data" ? "datastore:AddItem" :
+                    "util:SetVariables",
+            type: node.type,
+            label: node.label,
+            parameters: node.config,
+            position: { x: index * 200, y: 0 },
+          })),
+          routes: template.conditions.map((c, index) => ({
+            id: index + 1,
+            type: "router",
+            condition: {
+              field: c.field,
+              operator: c.operator,
+              value: c.value,
+            },
+            then_route: c.thenAction,
+            else_route: c.elseAction,
+          })),
+        },
+        integration_notes: [
+          "This scenario was exported from Lovable Workflow Builder.",
+          "Module mappings are suggestions - configure actual modules in Make.",
+          "AI nodes are mapped to OpenAI - adjust based on your subscription.",
+          "Webhooks require configuring a custom webhook trigger in Make."
+        ],
+      };
+      filename = `make-scenario-${template.name.replace(/\s+/g, '-').toLowerCase()}`;
+      fileExtension = "json";
+    } else {
+      // Standard JSON format
+      exportData = {
+        version: "1.0",
+        type: "lovable_custom_templates",
+        exportedAt: new Date().toISOString(),
+        templates: [{ ...template, icon: undefined }],
+      };
+      filename = `template-${template.name.replace(/\s+/g, '-').toLowerCase()}`;
+      fileExtension = "json";
+    }
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filename}-${new Date().toISOString().split('T')[0]}.${fileExtension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    const formatLabels = { json: "JSON", zapier: "Zapier Blueprint", make: "Make Scenario" };
+    toast.success(`تم تصدير القالب بتنسيق ${formatLabels[exportType]}`);
+    setExportFormatDialogOpen(false);
+    setExportingTemplate(null);
+  }, []);
+
+  // Open export format dialog
+  const openExportFormatDialog = useCallback((template: CustomTemplate, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setExportingTemplate(template);
+    setExportFormat("json");
+    setExportFormatDialogOpen(true);
+  }, []);
+
   // Import from external services (Zapier/Make)
   const importFromExternalService = useCallback(() => {
     if (!externalTemplateName.trim()) {
@@ -1391,6 +1734,7 @@ export const WorkflowBuilder = () => {
       setExternalTemplateDescription("");
       setZapierWebhookUrl("");
       setMakeWebhookUrl("");
+      setWebhookTestResult(null);
       
       toast.success(`تم استيراد القالب من ${externalServiceType === "zapier" ? "Zapier" : "Make"} بنجاح!`);
     } catch (error) {
@@ -2629,6 +2973,25 @@ export const WorkflowBuilder = () => {
                           </Button>
                         )}
 
+                        {/* Sync to Cloud Button */}
+                        {user && customTemplates.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={syncTemplatesToDatabase}
+                            disabled={isSyncingTemplates}
+                            className="gap-2"
+                            title={lastSyncTime ? `آخر مزامنة: ${formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true, locale: ar })}` : "مزامنة القوالب مع الخادم"}
+                          >
+                            {isSyncingTemplates ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4 text-blue-500" />
+                            )}
+                            مزامنة
+                          </Button>
+                        )}
+
                         {/* Import from External Services Button */}
                         <Button
                           variant="outline"
@@ -2705,7 +3068,7 @@ export const WorkflowBuilder = () => {
                                     onEdit={openEditTemplateDialog}
                                     onDelete={deleteCustomTemplate}
                                     onDuplicate={duplicateCustomTemplate}
-                                    onExportSingle={exportSingleTemplate}
+                                    onExportSingle={openExportFormatDialog}
                                     onToggleMerge={toggleMergeSelection}
                                     onAICategorize={aiCategorizeTemplate}
                                     onPreview={setPreviewTemplate}
@@ -2748,7 +3111,7 @@ export const WorkflowBuilder = () => {
                                   )}
                                 </button>
                                 <button
-                                  onClick={(e) => exportSingleTemplate(template as CustomTemplate, e)}
+                                  onClick={(e) => openExportFormatDialog(template as CustomTemplate, e)}
                                   className="p-1 rounded-full hover:bg-muted transition-colors"
                                   title="Export this template"
                                 >
@@ -4002,23 +4365,53 @@ export const WorkflowBuilder = () => {
               <Label>
                 رابط Webhook الخاص بـ {externalServiceType === "zapier" ? "Zapier" : "Make"} *
               </Label>
-              <Input
-                placeholder={`https://hooks.${externalServiceType === "zapier" ? "zapier.com" : "make.com"}/...`}
-                value={externalServiceType === "zapier" ? zapierWebhookUrl : makeWebhookUrl}
-                onChange={(e) => {
-                  if (externalServiceType === "zapier") {
-                    setZapierWebhookUrl(e.target.value);
-                  } else {
-                    setMakeWebhookUrl(e.target.value);
-                  }
-                }}
-              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder={`https://hooks.${externalServiceType === "zapier" ? "zapier.com" : "make.com"}/...`}
+                  value={externalServiceType === "zapier" ? zapierWebhookUrl : makeWebhookUrl}
+                  onChange={(e) => {
+                    if (externalServiceType === "zapier") {
+                      setZapierWebhookUrl(e.target.value);
+                    } else {
+                      setMakeWebhookUrl(e.target.value);
+                    }
+                    setWebhookTestResult(null);
+                  }}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={testWebhookConnection}
+                  disabled={isTestingWebhook || !(externalServiceType === "zapier" ? zapierWebhookUrl : makeWebhookUrl).trim()}
+                  className="gap-2 shrink-0"
+                >
+                  {isTestingWebhook ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : webhookTestResult === "success" ? (
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  ) : webhookTestResult === "error" ? (
+                    <XCircle className="w-4 h-4 text-destructive" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                  اختبار
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {externalServiceType === "zapier" 
                   ? "يمكنك الحصول على رابط Webhook من تطبيق Zapier عند إنشاء Zap جديد مع Webhooks by Zapier"
                   : "يمكنك الحصول على رابط Webhook من سيناريو Make عند إضافة Webhook module"
                 }
               </p>
+              {webhookTestResult && (
+                <p className={`text-xs mt-2 ${webhookTestResult === "success" ? "text-green-600" : "text-destructive"}`}>
+                  {webhookTestResult === "success" 
+                    ? "✓ تم إرسال الاختبار بنجاح - تحقق من سجل Webhook في الخدمة الخارجية"
+                    : "✗ فشل الاختبار - تحقق من صحة الرابط"
+                  }
+                </p>
+              )}
             </div>
 
             {/* Instructions */}
@@ -4031,7 +4424,10 @@ export const WorkflowBuilder = () => {
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setImportExternalDialogOpen(false)}>
+              <Button variant="ghost" onClick={() => {
+                setImportExternalDialogOpen(false);
+                setWebhookTestResult(null);
+              }}>
                 إلغاء
               </Button>
               <Button 
@@ -4047,6 +4443,116 @@ export const WorkflowBuilder = () => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Format Dialog */}
+      <Dialog open={exportFormatDialogOpen} onOpenChange={(open) => {
+        setExportFormatDialogOpen(open);
+        if (!open) {
+          setExportingTemplate(null);
+          setExportFormat("json");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="w-5 h-5 text-primary" />
+              تصدير القالب
+            </DialogTitle>
+          </DialogHeader>
+          {exportingTemplate && (
+            <div className="space-y-4">
+              {/* Template Preview */}
+              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">{exportingTemplate.name}</h4>
+                    <p className="text-sm text-muted-foreground">{exportingTemplate.nodes.length} nodes</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Format Selection */}
+              <div>
+                <Label className="mb-3 block">اختر تنسيق التصدير</Label>
+                <div className="grid gap-3">
+                  <button
+                    onClick={() => setExportFormat("json")}
+                    className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all text-right ${
+                      exportFormat === "json"
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="p-2 rounded-lg bg-blue-500/10">
+                      <FileText className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">JSON القياسي</p>
+                      <p className="text-xs text-muted-foreground">للاستيراد في تطبيقات Lovable أخرى</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setExportFormat("zapier")}
+                    className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all text-right ${
+                      exportFormat === "zapier"
+                        ? "border-orange-500 bg-orange-500/10"
+                        : "border-border hover:border-orange-500/50"
+                    }`}
+                  >
+                    <div className="p-2 rounded-lg bg-orange-500/10">
+                      <Zap className="w-5 h-5 text-orange-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">Zapier Blueprint</p>
+                      <p className="text-xs text-muted-foreground">تنسيق متوافق مع Zapier لإنشاء Zaps</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setExportFormat("make")}
+                    className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all text-right ${
+                      exportFormat === "make"
+                        ? "border-violet-500 bg-violet-500/10"
+                        : "border-border hover:border-violet-500/50"
+                    }`}
+                  >
+                    <div className="p-2 rounded-lg bg-violet-500/10">
+                      <GitBranch className="w-5 h-5 text-violet-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">Make Scenario</p>
+                      <p className="text-xs text-muted-foreground">تنسيق متوافق مع Make (Integromat)</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Note for external formats */}
+              {exportFormat !== "json" && (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    <AlertCircle className="w-4 h-4 inline mr-1" />
+                    التصدير إلى {exportFormat === "zapier" ? "Zapier" : "Make"} ينشئ ملفاً مرجعياً. 
+                    قد تحتاج إلى تعديل بعض الإعدادات في محرر {exportFormat === "zapier" ? "Zapier" : "Make"}.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setExportFormatDialogOpen(false)}>
+                  إلغاء
+                </Button>
+                <Button onClick={() => exportTemplateInFormat(exportingTemplate, exportFormat)}>
+                  <Download className="w-4 h-4 mr-2" />
+                  تصدير
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
