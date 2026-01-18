@@ -1,4 +1,5 @@
 import { Sparkles, Twitter, Linkedin, Github, Youtube } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const footerLinks = {
   product: [
@@ -20,8 +21,8 @@ const footerLinks = {
     { label: "Community", href: "#" },
   ],
   legal: [
-    { label: "Privacy Policy", href: "#" },
-    { label: "Terms of Service", href: "#" },
+    { label: "Privacy Policy", href: "/privacy", isRoute: true },
+    { label: "Terms of Service", href: "/terms", isRoute: true },
     { label: "Cookie Policy", href: "#" },
   ],
 };
@@ -109,9 +110,15 @@ export const Footer = () => {
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.label}>
-                  <a href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {link.label}
-                  </a>
+                  {link.isRoute ? (
+                    <Link to={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

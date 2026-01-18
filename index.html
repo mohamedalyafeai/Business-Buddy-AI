@@ -6,23 +6,180 @@
     <title>AgentAI - AI-Powered Business Automation | 24/7 Customer Support</title>
     <meta name="description" content="Transform your business with AgentAI. Automate customer support, streamline operations, and scale with intelligent AI agents that work 24/7. Start your free trial today." />
     <meta name="author" content="AgentAI" />
-    <meta name="keywords" content="AI agent, business automation, customer support, chatbot, artificial intelligence" />
+    <meta name="keywords" content="AI agent, business automation, customer support, chatbot, artificial intelligence, workflow automation" />
     <link rel="canonical" href="https://agentai.com" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#6366f1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AgentAI" />
 
+    <!-- Open Graph -->
     <meta property="og:title" content="AgentAI - AI-Powered Business Automation" />
-    <meta property="og:description" content="Transform your business with intelligent AI agents that work 24/7." />
+    <meta property="og:description" content="Transform your business with intelligent AI agents that work 24/7. Automate customer support, streamline operations, and scale effortlessly." />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://agentai.com" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="AgentAI" />
+    <meta property="og:locale" content="en_US" />
 
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@AgentAI" />
+    <meta name="twitter:creator" content="@AgentAI" />
     <meta name="twitter:title" content="AgentAI - AI-Powered Business Automation" />
     <meta name="twitter:description" content="Transform your business with intelligent AI agents that work 24/7." />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    
+    <!-- Additional SEO -->
+    <meta name="robots" content="index, follow" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "AgentAI",
+      "applicationCategory": "BusinessApplication",
+      "description": "AI-powered business automation platform with intelligent agents for customer support and workflow automation.",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "description": "Free trial available"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "1250"
+      }
+    }
+    </script>
+    
+    <!-- Splash Screen Styles -->
+    <style>
+      #splash-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+      }
+      #splash-screen.hidden {
+        opacity: 0;
+        visibility: hidden;
+      }
+      .splash-logo {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 24px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+      .splash-logo svg {
+        width: 48px;
+        height: 48px;
+        color: white;
+      }
+      .splash-text {
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 28px;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 8px;
+      }
+      .splash-subtitle {
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 32px;
+      }
+      .splash-loader {
+        width: 200px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .splash-loader-bar {
+        width: 40%;
+        height: 100%;
+        background: linear-gradient(90deg, #6366f1, #8b5cf6);
+        border-radius: 4px;
+        animation: loading 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+      @keyframes loading {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(350%); }
+      }
+    </style>
   </head>
 
   <body>
+    <!-- Splash Screen -->
+    <div id="splash-screen">
+      <div class="splash-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 8V4H8"/>
+          <rect width="16" height="12" x="4" y="8" rx="2"/>
+          <path d="M2 14h2"/>
+          <path d="M20 14h2"/>
+          <path d="M15 13v2"/>
+          <path d="M9 13v2"/>
+        </svg>
+      </div>
+      <div class="splash-text">AgentAI</div>
+      <div class="splash-subtitle">Intelligent Automation Platform</div>
+      <div class="splash-loader">
+        <div class="splash-loader-bar"></div>
+      </div>
+    </div>
+    
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <script>
+      // Hide splash screen when app is ready
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          var splash = document.getElementById('splash-screen');
+          if (splash) {
+            splash.classList.add('hidden');
+            setTimeout(function() {
+              splash.remove();
+            }, 500);
+          }
+        }, 1000);
+      });
+    </script>
   </body>
 </html>
