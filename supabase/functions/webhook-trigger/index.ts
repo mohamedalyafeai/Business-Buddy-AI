@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-timestamp, x-signature",
 };
 
 interface WebhookPayload {
@@ -11,6 +11,49 @@ interface WebhookPayload {
   webhookId?: string;
   data?: Record<string, unknown>;
   variables?: Record<string, unknown>;
+}
+
+// Rate limiting store (in-memory, resets on function cold start)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT = 100; // requests per minute
+const RATE_LIMIT_WINDOW = 60000; // 1 minute in ms
+
+function checkRateLimit(identifier: string): boolean {
+  const now = Date.now();
+  const record = rateLimitStore.get(identifier);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(identifier, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  
+  if (record.count >= RATE_LIMIT) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
+// HMAC signature verification
+async function verifySignature(payload: string, signature: string, secret: string): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const signatureBuffer = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+    const computedSignature = Array.from(new Uint8Array(signatureBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    return computedSignature === signature;
+  } catch {
+    return false;
+  }
 }
 
 serve(async (req) => {
@@ -26,6 +69,23 @@ serve(async (req) => {
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
     
+    // Get client IP for rate limiting
+    const clientIP = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+                     req.headers.get("x-real-ip") || 
+                     "unknown";
+    
+    // Check rate limit
+    if (!checkRateLimit(clientIP)) {
+      console.log(`Rate limit exceeded for IP: ${clientIP}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Rate limit exceeded. Please try again later.",
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Support both /webhook-trigger/workflow-id and body-based workflow ID
     let workflowId = pathParts[pathParts.length - 1];
     if (workflowId === 'webhook-trigger') {
@@ -33,10 +93,12 @@ serve(async (req) => {
     }
 
     let payload: WebhookPayload = {};
+    let rawBody = "";
     
     if (req.method === "POST" && req.headers.get("content-type")?.includes("application/json")) {
       try {
-        payload = await req.json();
+        rawBody = await req.text();
+        payload = JSON.parse(rawBody);
       } catch {
         payload = {};
       }
@@ -61,7 +123,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Webhook triggered for workflow: ${finalWorkflowId}`);
+    console.log(`Webhook triggered for workflow: ${finalWorkflowId} from IP: ${clientIP}`);
 
     // Fetch the workflow
     const { data: workflow, error: workflowError } = await supabase
@@ -89,14 +151,47 @@ serve(async (req) => {
       );
     }
 
-    // Verify webhook secret if configured
+    // Security: Verify webhook secret (REQUIRED if configured)
     const webhookSecret = workflow.trigger_config?.webhookSecret;
-    if (webhookSecret) {
+    const requireSecret = workflow.trigger_config?.requireSecret !== false; // Default to true
+    
+    if (webhookSecret && requireSecret) {
       const providedSecret = req.headers.get("x-webhook-secret") || url.searchParams.get("secret");
-      if (providedSecret !== webhookSecret) {
-        console.log("Invalid webhook secret");
+      const providedSignature = req.headers.get("x-signature");
+      
+      // Try signature-based authentication first
+      if (providedSignature && rawBody) {
+        const isValidSignature = await verifySignature(rawBody, providedSignature, webhookSecret);
+        if (!isValidSignature) {
+          console.log(`Invalid signature for workflow: ${finalWorkflowId}`);
+          return new Response(
+            JSON.stringify({ success: false, error: "Invalid webhook signature" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } else if (providedSecret !== webhookSecret) {
+        console.log(`Invalid webhook secret for workflow: ${finalWorkflowId}`);
         return new Response(
           JSON.stringify({ success: false, error: "Invalid webhook secret" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else if (!webhookSecret && requireSecret) {
+      // If no secret configured but required, warn in logs
+      console.warn(`WARNING: Workflow ${finalWorkflowId} has no webhook secret configured!`);
+    }
+
+    // Timestamp validation (prevent replay attacks)
+    const timestamp = req.headers.get("x-timestamp");
+    if (timestamp) {
+      const requestTime = parseInt(timestamp, 10);
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      if (isNaN(requestTime) || Math.abs(now - requestTime) > fiveMinutes) {
+        console.log(`Stale or invalid timestamp for workflow: ${finalWorkflowId}`);
+        return new Response(
+          JSON.stringify({ success: false, error: "Request timestamp is invalid or too old" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -157,12 +252,14 @@ serve(async (req) => {
           source: "webhook",
           method: req.method,
           timestamp: new Date().toISOString(),
+          clientIP,
           payload: payload.data || {},
           variables,
           headers: Object.fromEntries(
             [...req.headers.entries()].filter(([key]) => 
               !key.toLowerCase().includes('authorization') && 
-              !key.toLowerCase().includes('secret')
+              !key.toLowerCase().includes('secret') &&
+              !key.toLowerCase().includes('signature')
             )
           ),
         },
@@ -172,7 +269,10 @@ serve(async (req) => {
 
     const executeResult = await executeResponse.json();
 
-    console.log(`Webhook execution result:`, executeResult.success);
+    console.log(`Webhook execution completed for workflow ${finalWorkflowId}:`, {
+      success: executeResult.success,
+      clientIP,
+    });
 
     return new Response(
       JSON.stringify({
