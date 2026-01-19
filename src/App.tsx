@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { WorkAssistantWidget } from "@/components/WorkAssistantWidget";
 import { FloatingWidget } from "@/components/FloatingWidget";
 import { CommandPalette } from "@/components/CommandPalette";
+import { CookieConsent } from "@/components/CookieConsent";
 import { ThemeProvider } from "next-themes";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import Index from "./pages/Index";
@@ -68,6 +69,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             <FloatingWidgets />
+            <CookieConsent />
           </BrowserRouter>
         </AuthProvider>
       </TooltipProvider>
