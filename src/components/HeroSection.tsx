@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Zap, Shield, Clock } from "lucide-react";
 import { ChatDemoWidget } from "./ChatDemoWidget";
@@ -10,6 +11,8 @@ const floatingElements = [
 ];
 
 export const HeroSection = () => {
+  const { t } = useTranslation();
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden section-padding pt-32">
       {/* Background Effects */}
@@ -31,7 +34,7 @@ export const HeroSection = () => {
       <div className="container-custom relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left side - Content */}
-          <div className="text-center lg:text-left">
+          <div className="text-center lg:text-start">
             {/* Badge */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -40,7 +43,7 @@ export const HeroSection = () => {
             >
               <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-sm text-muted-foreground mb-8">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                Powered by Advanced AI Technology
+                {t("hero.badge")}
               </span>
             </motion.div>
 
@@ -51,10 +54,8 @@ export const HeroSection = () => {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6"
             >
-              Your{" "}
-              <span className="gradient-text">AI Agent</span>
-              <br />
-              That Works 24/7
+              {t("hero.title")}{" "}
+              <span className="gradient-text">{t("hero.titleHighlight")}</span>
             </motion.h1>
 
             {/* Subheading */}
@@ -64,8 +65,7 @@ export const HeroSection = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-10 text-balance"
             >
-              Automate customer support, streamline operations, and scale your business 
-              with an intelligent AI agent that never sleeps.
+              {t("hero.description")}
             </motion.p>
 
             {/* CTA Buttons */}
@@ -76,12 +76,12 @@ export const HeroSection = () => {
               className="flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-4"
             >
               <Button variant="hero" size="lg">
-                Start Free Trial
+                {t("hero.getStartedFree")}
                 <ArrowRight className="w-5 h-5" />
               </Button>
               <Button variant="glass" size="lg">
                 <Play className="w-5 h-5" />
-                Watch Demo
+                {t("hero.watchDemo")}
               </Button>
             </motion.div>
 
@@ -97,7 +97,7 @@ export const HeroSection = () => {
                 { value: "5M+", label: "Tasks Automated" },
                 { value: "99.9%", label: "Uptime" },
               ].map((stat) => (
-                <div key={stat.label} className="text-center lg:text-left">
+                <div key={stat.label} className="text-center lg:text-start">
                   <div className="text-2xl md:text-3xl font-bold gradient-text">{stat.value}</div>
                   <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
                 </div>

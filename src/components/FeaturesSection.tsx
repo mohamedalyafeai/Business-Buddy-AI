@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { 
   MessageSquare, 
   Brain, 
@@ -9,49 +10,6 @@ import {
   Workflow,
   Clock
 } from "lucide-react";
-
-const features = [
-  {
-    icon: MessageSquare,
-    title: "Smart Conversations",
-    description: "Natural language processing that understands context and provides human-like responses to your customers.",
-  },
-  {
-    icon: Brain,
-    title: "Continuous Learning",
-    description: "The AI agent learns from every interaction, constantly improving its ability to help your business.",
-  },
-  {
-    icon: Zap,
-    title: "Instant Responses",
-    description: "Lightning-fast response times ensure your customers never wait, improving satisfaction rates.",
-  },
-  {
-    icon: Shield,
-    title: "Enterprise Security",
-    description: "Bank-grade encryption and compliance with GDPR, SOC 2, and HIPAA standards.",
-  },
-  {
-    icon: BarChart3,
-    title: "Analytics Dashboard",
-    description: "Comprehensive insights into customer interactions, trends, and agent performance metrics.",
-  },
-  {
-    icon: Globe,
-    title: "Multi-Language Support",
-    description: "Communicate with customers in 50+ languages with automatic translation capabilities.",
-  },
-  {
-    icon: Workflow,
-    title: "Workflow Automation",
-    description: "Automate repetitive tasks and integrate with your existing tools and workflows seamlessly.",
-  },
-  {
-    icon: Clock,
-    title: "24/7 Availability",
-    description: "Never miss a customer inquiry. Your AI agent works around the clock without breaks.",
-  },
-];
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -69,6 +27,51 @@ const itemVariants = {
 };
 
 export const FeaturesSection = () => {
+  const { t } = useTranslation();
+
+  const features = [
+    {
+      icon: MessageSquare,
+      title: t("features.smartConversations"),
+      description: t("features.smartConversationsDesc"),
+    },
+    {
+      icon: Brain,
+      title: t("features.continuousLearning"),
+      description: t("features.continuousLearningDesc"),
+    },
+    {
+      icon: Zap,
+      title: t("features.instantResponses"),
+      description: t("features.instantResponsesDesc"),
+    },
+    {
+      icon: Shield,
+      title: t("features.enterpriseSecurity"),
+      description: t("features.enterpriseSecurityDesc"),
+    },
+    {
+      icon: BarChart3,
+      title: t("features.analyticsDashboard"),
+      description: t("features.analyticsDashboardDesc"),
+    },
+    {
+      icon: Globe,
+      title: t("features.multiLanguage"),
+      description: t("features.multiLanguageDesc"),
+    },
+    {
+      icon: Workflow,
+      title: t("features.workflowAutomation"),
+      description: t("features.workflowAutomationDesc"),
+    },
+    {
+      icon: Clock,
+      title: t("features.availability"),
+      description: t("features.availabilityDesc"),
+    },
+  ];
+
   return (
     <section id="features" className="section-padding relative">
       <div className="container-custom">
@@ -79,14 +82,15 @@ export const FeaturesSection = () => {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <span className="text-primary font-semibold text-sm uppercase tracking-wider">Features</span>
+          <span className="text-primary font-semibold text-sm uppercase tracking-wider">
+            {t("features.label")}
+          </span>
           <h2 className="text-3xl md:text-5xl font-bold mt-4 mb-6">
-            Everything You Need to{" "}
-            <span className="gradient-text">Scale</span>
+            {t("features.title")}{" "}
+            <span className="gradient-text">{t("features.titleHighlight")}</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Our AI agent comes packed with powerful features designed to transform 
-            how your business operates and interacts with customers.
+            {t("features.description")}
           </p>
         </motion.div>
 

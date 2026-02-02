@@ -1,8 +1,11 @@
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 export const CTASection = () => {
+  const { t } = useTranslation();
+
   return (
     <section className="section-padding relative overflow-hidden">
       {/* Background Effects */}
@@ -20,31 +23,30 @@ export const CTASection = () => {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-sm text-muted-foreground mb-8">
             <Sparkles className="w-4 h-4 text-primary" />
-            Start your free 14-day trial today
+            {t("cta.badge")}
           </div>
 
           <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6">
-            Ready to Transform Your{" "}
-            <span className="gradient-text">Business</span>?
+            {t("cta.title")}{" "}
+            <span className="gradient-text">{t("cta.titleHighlight")}</span>?
           </h2>
 
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-            Join thousands of businesses already using AgentAI to automate customer support, 
-            boost sales, and scale operations effortlessly.
+            {t("cta.description")}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button variant="hero" size="lg">
-              Get Started Free
+              {t("cta.getStartedFree")}
               <ArrowRight className="w-5 h-5" />
             </Button>
             <Button variant="glass" size="lg">
-              Schedule a Demo
+              {t("cta.scheduleDemo")}
             </Button>
           </div>
 
           <p className="text-sm text-muted-foreground mt-6">
-            No credit card required · Cancel anytime
+            {t("cta.noCreditCard")}
           </p>
         </motion.div>
       </div>
