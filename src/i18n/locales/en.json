@@ -6,6 +6,10 @@
     "pricing": "Pricing",
     "faq": "FAQ",
     "dashboard": "Dashboard",
+    "profile": "Profile",
+    "settings": "Settings",
+    "signOut": "Sign Out",
+    "quickActions": "Quick Actions",
     "signIn": "Sign In",
     "getStarted": "Get Started"
   },
