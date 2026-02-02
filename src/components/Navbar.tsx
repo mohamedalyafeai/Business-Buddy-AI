@@ -131,23 +131,23 @@ export const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">Quick Actions</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">{t("nav.quickActions")}</DropdownMenuLabel>
                   <DropdownMenuItem onClick={() => navigate("/dashboard")}>
                     <LayoutDashboard className="w-4 h-4 me-2" />
                     {t("nav.dashboard")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/profile")}>
                     <User className="w-4 h-4 me-2" />
-                    Profile
+                    {t("nav.profile")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/settings")}>
                     <Settings className="w-4 h-4 me-2" />
-                    Settings
+                    {t("nav.settings")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
-                    <LogOut className="w-4 w-4 me-2" />
-                    Sign Out
+                    <LogOut className="w-4 h-4 me-2" />
+                    {t("nav.signOut")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -220,15 +220,15 @@ export const Navbar = () => {
                     </Button>
                     <Button variant="ghost" onClick={() => { navigate("/profile"); setIsOpen(false); }}>
                       <User className="w-4 h-4 me-2" />
-                      Profile
+                      {t("nav.profile")}
                     </Button>
                     <Button variant="ghost" onClick={() => { navigate("/settings"); setIsOpen(false); }}>
                       <Settings className="w-4 h-4 me-2" />
-                      Settings
+                      {t("nav.settings")}
                     </Button>
                     <Button variant="ghost" onClick={handleSignOut} className="text-destructive">
                       <LogOut className="w-4 h-4 me-2" />
-                      Sign Out
+                      {t("nav.signOut")}
                     </Button>
                   </>
                 ) : (
