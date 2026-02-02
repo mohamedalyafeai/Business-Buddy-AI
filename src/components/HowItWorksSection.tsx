@@ -1,34 +1,37 @@
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { Settings, Cpu, Rocket, TrendingUp } from "lucide-react";
 
-const steps = [
-  {
-    step: "01",
-    icon: Settings,
-    title: "Configure Your Agent",
-    description: "Set up your AI agent in minutes. Define its personality, knowledge base, and the tasks you want it to handle.",
-  },
-  {
-    step: "02",
-    icon: Cpu,
-    title: "Train & Customize",
-    description: "Upload your data, FAQs, and business documents. The AI learns your products, services, and brand voice.",
-  },
-  {
-    step: "03",
-    icon: Rocket,
-    title: "Deploy Instantly",
-    description: "Launch your AI agent across multiple channels — website, social media, email, and more with one click.",
-  },
-  {
-    step: "04",
-    icon: TrendingUp,
-    title: "Scale & Optimize",
-    description: "Monitor performance, gather insights, and let the AI continuously improve based on real interactions.",
-  },
-];
-
 export const HowItWorksSection = () => {
+  const { t } = useTranslation();
+
+  const steps = [
+    {
+      step: "01",
+      icon: Settings,
+      title: t("howItWorks.step1"),
+      description: t("howItWorks.step1Desc"),
+    },
+    {
+      step: "02",
+      icon: Cpu,
+      title: t("howItWorks.step2"),
+      description: t("howItWorks.step2Desc"),
+    },
+    {
+      step: "03",
+      icon: Rocket,
+      title: t("howItWorks.step3"),
+      description: t("howItWorks.step3Desc"),
+    },
+    {
+      step: "04",
+      icon: TrendingUp,
+      title: t("howItWorks.step4"),
+      description: t("howItWorks.step4Desc"),
+    },
+  ];
+
   return (
     <section id="how-it-works" className="section-padding relative bg-card/50">
       <div className="container-custom">
@@ -39,21 +42,22 @@ export const HowItWorksSection = () => {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <span className="text-primary font-semibold text-sm uppercase tracking-wider">How It Works</span>
+          <span className="text-primary font-semibold text-sm uppercase tracking-wider">
+            {t("howItWorks.label")}
+          </span>
           <h2 className="text-3xl md:text-5xl font-bold mt-4 mb-6">
-            Get Started in{" "}
-            <span className="gradient-text">4 Simple Steps</span>
+            {t("howItWorks.title")}{" "}
+            <span className="gradient-text">{t("howItWorks.titleHighlight")}</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            From setup to deployment, getting your AI agent up and running 
-            is faster than you think.
+            {t("howItWorks.description")}
           </p>
         </motion.div>
 
         {/* Steps */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 relative">
           {/* Connection Line */}
-          <div className="hidden lg:block absolute top-24 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-primary via-accent to-primary" />
+          <div className="hidden lg:block absolute top-24 start-[12.5%] end-[12.5%] h-0.5 bg-gradient-to-r from-primary via-accent to-primary rtl:bg-gradient-to-l" />
 
           {steps.map((step, index) => (
             <motion.div
@@ -70,7 +74,7 @@ export const HowItWorksSection = () => {
               </div>
 
               {/* Step Number Badge */}
-              <span className="absolute top-0 right-1/2 translate-x-12 -translate-y-2 text-xs font-bold px-2 py-1 rounded-full bg-primary text-primary-foreground">
+              <span className="absolute top-0 end-1/2 translate-x-12 rtl:-translate-x-12 -translate-y-2 text-xs font-bold px-2 py-1 rounded-full bg-primary text-primary-foreground">
                 {step.step}
               </span>
 

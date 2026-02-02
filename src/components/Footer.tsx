@@ -1,31 +1,6 @@
+import { useTranslation } from "react-i18next";
 import { Sparkles, Twitter, Linkedin, Github, Youtube } from "lucide-react";
 import { Link } from "react-router-dom";
-
-const footerLinks = {
-  product: [
-    { label: "Features", href: "#features" },
-    { label: "Pricing", href: "#pricing" },
-    { label: "Integrations", href: "#" },
-    { label: "Changelog", href: "#" },
-  ],
-  company: [
-    { label: "About", href: "#" },
-    { label: "Blog", href: "#" },
-    { label: "Careers", href: "#" },
-    { label: "Contact", href: "#" },
-  ],
-  resources: [
-    { label: "Documentation", href: "#" },
-    { label: "API Reference", href: "#" },
-    { label: "Help Center", href: "#" },
-    { label: "Community", href: "#" },
-  ],
-  legal: [
-    { label: "Privacy Policy", href: "/privacy", isRoute: true },
-    { label: "Terms of Service", href: "/terms", isRoute: true },
-    { label: "Cookie Policy", href: "#" },
-  ],
-};
 
 const socialLinks = [
   { icon: Twitter, href: "#", label: "Twitter" },
@@ -35,6 +10,34 @@ const socialLinks = [
 ];
 
 export const Footer = () => {
+  const { t } = useTranslation();
+
+  const footerLinks = {
+    product: [
+      { label: t("footer.features"), href: "#features" },
+      { label: t("footer.pricing"), href: "#pricing" },
+      { label: t("footer.integrations"), href: "#" },
+      { label: t("footer.changelog"), href: "#" },
+    ],
+    company: [
+      { label: t("footer.about"), href: "#" },
+      { label: t("footer.blog"), href: "#" },
+      { label: t("footer.careers"), href: "#" },
+      { label: t("footer.contact"), href: "#" },
+    ],
+    resources: [
+      { label: t("footer.documentation"), href: "#" },
+      { label: t("footer.apiReference"), href: "#" },
+      { label: t("footer.helpCenter"), href: "#" },
+      { label: t("footer.community"), href: "#" },
+    ],
+    legal: [
+      { label: t("footer.privacyPolicy"), href: "/privacy", isRoute: true },
+      { label: t("footer.termsOfService"), href: "/terms", isRoute: true },
+      { label: t("footer.cookiePolicy"), href: "#" },
+    ],
+  };
+
   return (
     <footer className="border-t border-border bg-card/50">
       <div className="container-custom section-padding pb-8">
@@ -48,8 +51,7 @@ export const Footer = () => {
               <span className="text-xl font-bold text-foreground">AgentAI</span>
             </a>
             <p className="text-muted-foreground text-sm leading-relaxed max-w-xs mb-6">
-              Empowering businesses with intelligent AI agents that work 24/7 to automate, 
-              engage, and scale.
+              {t("footer.description")}
             </p>
             <div className="flex gap-4">
               {socialLinks.map((social) => (
@@ -67,7 +69,7 @@ export const Footer = () => {
 
           {/* Links */}
           <div>
-            <h4 className="font-semibold mb-4">Product</h4>
+            <h4 className="font-semibold mb-4">{t("footer.product")}</h4>
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.label}>
@@ -80,7 +82,7 @@ export const Footer = () => {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">Company</h4>
+            <h4 className="font-semibold mb-4">{t("footer.company")}</h4>
             <ul className="space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.label}>
@@ -93,7 +95,7 @@ export const Footer = () => {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">Resources</h4>
+            <h4 className="font-semibold mb-4">{t("footer.resources")}</h4>
             <ul className="space-y-3">
               {footerLinks.resources.map((link) => (
                 <li key={link.label}>
@@ -106,7 +108,7 @@ export const Footer = () => {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
+            <h4 className="font-semibold mb-4">{t("footer.legal")}</h4>
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.label}>
@@ -128,10 +130,10 @@ export const Footer = () => {
         {/* Bottom */}
         <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} AgentAI. All rights reserved.
+            © {new Date().getFullYear()} AgentAI. {t("footer.allRightsReserved")}
           </p>
           <p className="text-sm text-muted-foreground">
-            Made with ❤️ for businesses worldwide
+            {t("footer.madeWith")}
           </p>
         </div>
       </div>

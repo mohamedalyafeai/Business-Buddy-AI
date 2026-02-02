@@ -101,6 +101,15 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Outfit', sans-serif;
   }
+
+  /* RTL Support */
+  html[dir="rtl"] {
+    font-family: 'Outfit', 'Noto Sans Arabic', sans-serif;
+  }
+
+  html[dir="rtl"] .gradient-text {
+    @apply bg-gradient-to-l from-primary to-accent;
+  }
 }
 
 @layer utilities {

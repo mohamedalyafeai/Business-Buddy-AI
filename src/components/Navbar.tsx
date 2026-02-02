@@ -2,9 +2,11 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Sparkles, LogOut, User, LayoutDashboard, Settings, Moon, Sun, Command } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,19 +21,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const navLinks = [
-  { label: "Features", href: "#features" },
-  { label: "How it Works", href: "#how-it-works" },
-  { label: "Use Cases", href: "#use-cases" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "FAQ", href: "#faq" },
-];
-
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const { t } = useTranslation();
+
+  const navLinks = [
+    { label: t("nav.features"), href: "#features" },
+    { label: t("nav.howItWorks"), href: "#how-it-works" },
+    { label: t("nav.useCases"), href: "#use-cases" },
+    { label: t("nav.pricing"), href: "#pricing" },
+    { label: t("nav.faq"), href: "#faq" },
+  ];
 
   const handleSignOut = async () => {
     await signOut();
@@ -64,7 +67,7 @@ export const Navbar = () => {
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
               <a
-                key={link.label}
+                key={link.href}
                 href={link.href}
                 className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
               >
@@ -75,6 +78,9 @@ export const Navbar = () => {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Language Switcher */}
+            <LanguageSwitcher />
+
             {/* Command Palette Trigger */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -127,20 +133,20 @@ export const Navbar = () => {
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuLabel className="text-xs text-muted-foreground">Quick Actions</DropdownMenuLabel>
                   <DropdownMenuItem onClick={() => navigate("/dashboard")}>
-                    <LayoutDashboard className="w-4 h-4 mr-2" />
-                    Dashboard
+                    <LayoutDashboard className="w-4 h-4 me-2" />
+                    {t("nav.dashboard")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/profile")}>
-                    <User className="w-4 h-4 mr-2" />
+                    <User className="w-4 h-4 me-2" />
                     Profile
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/settings")}>
-                    <Settings className="w-4 h-4 mr-2" />
+                    <Settings className="w-4 h-4 me-2" />
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
-                    <LogOut className="w-4 h-4 mr-2" />
+                    <LogOut className="w-4 w-4 me-2" />
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -148,10 +154,10 @@ export const Navbar = () => {
             ) : (
               <>
                 <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
-                  Log In
+                  {t("nav.signIn")}
                 </Button>
                 <Button variant="default" size="sm" onClick={() => navigate("/auth")}>
-                  Get Started
+                  {t("nav.getStarted")}
                 </Button>
               </>
             )}
@@ -159,6 +165,7 @@ export const Navbar = () => {
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
+            <LanguageSwitcher />
             <Button
               variant="ghost"
               size="icon"
@@ -190,7 +197,7 @@ export const Navbar = () => {
             <div className="container-custom py-6 flex flex-col gap-4">
               {navLinks.map((link) => (
                 <a
-                  key={link.label}
+                  key={link.href}
                   href={link.href}
                   className="text-muted-foreground hover:text-foreground transition-colors py-2"
                   onClick={() => setIsOpen(false)}
@@ -208,29 +215,29 @@ export const Navbar = () => {
                       </span>
                     </div>
                     <Button variant="ghost" onClick={() => { navigate("/dashboard"); setIsOpen(false); }}>
-                      <LayoutDashboard className="w-4 h-4 mr-2" />
-                      Dashboard
+                      <LayoutDashboard className="w-4 h-4 me-2" />
+                      {t("nav.dashboard")}
                     </Button>
                     <Button variant="ghost" onClick={() => { navigate("/profile"); setIsOpen(false); }}>
-                      <User className="w-4 h-4 mr-2" />
+                      <User className="w-4 h-4 me-2" />
                       Profile
                     </Button>
                     <Button variant="ghost" onClick={() => { navigate("/settings"); setIsOpen(false); }}>
-                      <Settings className="w-4 h-4 mr-2" />
+                      <Settings className="w-4 h-4 me-2" />
                       Settings
                     </Button>
                     <Button variant="ghost" onClick={handleSignOut} className="text-destructive">
-                      <LogOut className="w-4 h-4 mr-2" />
+                      <LogOut className="w-4 h-4 me-2" />
                       Sign Out
                     </Button>
                   </>
                 ) : (
                   <>
                     <Button variant="ghost" onClick={() => { navigate("/auth"); setIsOpen(false); }}>
-                      Log In
+                      {t("nav.signIn")}
                     </Button>
                     <Button variant="default" onClick={() => { navigate("/auth"); setIsOpen(false); }}>
-                      Get Started
+                      {t("nav.getStarted")}
                     </Button>
                   </>
                 )}
