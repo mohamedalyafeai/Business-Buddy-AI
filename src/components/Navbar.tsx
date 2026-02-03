@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, X, Sparkles, LogOut, User, LayoutDashboard, Settings, Moon, Sun, Command } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,6 +118,9 @@ export const Navbar = () => {
                 <p>Toggle theme</p>
               </TooltipContent>
             </Tooltip>
+
+            {/* Notifications - Only show for logged in users */}
+            {user && <NotificationCenter />}
 
             {user ? (
               <DropdownMenu>

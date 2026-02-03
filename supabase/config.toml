@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.categorize-template]
 verify_jwt = false
+
+[functions.ai-workflow-suggestions]
+verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false
