@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageSquare, Calendar, TrendingUp, Clock, Loader2, Trash2, Download, FileJson, FileText, Zap, Sparkles, Shield } from "lucide-react";
+import { MessageSquare, Calendar, TrendingUp, Clock, Loader2, Trash2, Download, FileJson, FileText, Zap, Sparkles, Shield, BarChart3, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,8 @@ import { AdminUserManagement } from "@/components/admin/AdminUserManagement";
 import { AdminWorkflowAnalytics } from "@/components/admin/AdminWorkflowAnalytics";
 import { AdminSystemSettings } from "@/components/admin/AdminSystemSettings";
 import { AdminAuditLogs } from "@/components/admin/AdminAuditLogs";
+import { AdvancedAnalytics } from "@/components/AdvancedAnalytics";
+import { AIWorkflowAssistant } from "@/components/AIWorkflowAssistant";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -203,7 +205,7 @@ const Dashboard = () => {
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6 sm:mb-8">Dashboard</h1>
 
         <Tabs defaultValue="overview" className="space-y-6 sm:space-y-8">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-2 sm:grid-cols-4 max-w-2xl' : 'grid-cols-3 max-w-md'} h-auto`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3 sm:grid-cols-5 max-w-3xl' : 'grid-cols-2 sm:grid-cols-4 max-w-2xl'} h-auto`}>
             <TabsTrigger value="overview" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
               <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
               <span className="hidden xs:inline">Overview</span>
@@ -218,6 +220,11 @@ const Dashboard = () => {
               <Zap className="w-3 h-3 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">Workflows</span>
               <span className="sm:hidden">Tasks</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Analytics</span>
+              <span className="sm:hidden">Charts</span>
             </TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="admin" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
@@ -379,6 +386,12 @@ const Dashboard = () => {
           {/* Workflows Tab */}
           <TabsContent value="workflows">
             <WorkflowBuilder />
+            <AIWorkflowAssistant />
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            <AdvancedAnalytics />
           </TabsContent>
 
           {/* Admin Tab - Only visible to admins */}
