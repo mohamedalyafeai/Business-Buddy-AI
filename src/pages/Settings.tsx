@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "next-themes";
 import { 
   Bell, 
@@ -60,6 +61,7 @@ import {
 } from "@/components/ui/dialog";
 
 const Settings = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -160,9 +162,9 @@ const Settings = () => {
       setVerifyCode("");
       setQrCode(null);
       setSecret(null);
-      toast.success("Two-factor authentication enabled successfully!");
+      toast.success(t("settings.2faEnabled"));
     } catch (error: any) {
-      toast.error(error.message || "Invalid verification code");
+      toast.error(error.message || t("settings.invalidCode"));
     } finally {
       setVerifying(false);
     }
@@ -180,7 +182,7 @@ const Settings = () => {
       setMfaEnabled(false);
       setFactorId(null);
       setUnenrollDialogOpen(false);
-      toast.success("Two-factor authentication disabled");
+      toast.success(t("settings.2faDisabled"));
     } catch (error: any) {
       toast.error(error.message || "Failed to disable 2FA");
     } finally {
@@ -207,7 +209,7 @@ const Settings = () => {
         setWeeklyDigest(value);
         break;
     }
-    toast.success("Notification settings updated");
+    toast.success(t("settings.notificationSettingsUpdated"));
   };
 
   const handleDeleteAccount = async () => {
@@ -230,7 +232,7 @@ const Settings = () => {
                 <BreadcrumbLink asChild>
                   <Link to="/" className="flex items-center gap-1">
                     <Home className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Home</span>
+                    <span className="hidden sm:inline">{t("breadcrumb.home")}</span>
                   </Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
@@ -239,14 +241,14 @@ const Settings = () => {
               </BreadcrumbSeparator>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link to="/dashboard">Dashboard</Link>
+                  <Link to="/dashboard">{t("breadcrumb.dashboard")}</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator>
                 <ChevronRight className="h-3.5 w-3.5" />
               </BreadcrumbSeparator>
               <BreadcrumbItem>
-                <BreadcrumbPage>Settings</BreadcrumbPage>
+                <BreadcrumbPage>{t("breadcrumb.settings")}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -261,11 +263,11 @@ const Settings = () => {
             className="mb-4 -ml-2"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+            {t("settings.backToDashboard")}
           </Button>
 
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6 sm:mb-8">
-            Settings
+            {t("settings.title")}
           </h1>
 
           <div className="space-y-6">
@@ -274,10 +276,10 @@ const Settings = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-primary" />
-                  Security
+                  {t("settings.security")}
                 </CardTitle>
                 <CardDescription>
-                  Protect your account with additional security measures
+                  {t("settings.securityDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -286,23 +288,23 @@ const Settings = () => {
                     <KeyRound className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium">Two-Factor Authentication</p>
+                        <p className="font-medium">{t("settings.twoFactorAuth")}</p>
                         {mfaLoading ? (
                           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                         ) : mfaEnabled ? (
                           <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Enabled
+                            {t("settings.enabled")}
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="bg-muted text-muted-foreground">
                             <XCircle className="h-3 w-3 mr-1" />
-                            Disabled
+                            {t("settings.disabled")}
                           </Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Add an extra layer of security using an authenticator app
+                        {t("settings.twoFactorAuthDesc")}
                       </p>
                     </div>
                   </div>
@@ -313,7 +315,7 @@ const Settings = () => {
                       onClick={() => setUnenrollDialogOpen(true)}
                       disabled={mfaLoading}
                     >
-                      Disable 2FA
+                      {t("settings.disable2FA")}
                     </Button>
                   ) : (
                     <Button 
@@ -325,10 +327,10 @@ const Settings = () => {
                       {enrolling ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Setting up...
+                          {t("settings.settingUp")}
                         </>
                       ) : (
-                        "Enable 2FA"
+                        t("settings.enable2FA")
                       )}
                     </Button>
                   )}
@@ -341,10 +343,10 @@ const Settings = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bell className="h-5 w-5 text-primary" />
-                  Notifications
+                  {t("settings.notifications")}
                 </CardTitle>
                 <CardDescription>
-                  Manage how you receive notifications and alerts
+                  {t("settings.notificationsDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -353,10 +355,10 @@ const Settings = () => {
                     <Mail className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <Label htmlFor="email-notifications" className="font-medium">
-                        Email Notifications
+                        {t("settings.emailNotifications")}
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        Receive updates via email
+                        {t("settings.emailNotificationsDesc")}
                       </p>
                     </div>
                   </div>
@@ -374,10 +376,10 @@ const Settings = () => {
                     <Smartphone className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <Label htmlFor="push-notifications" className="font-medium">
-                        Push Notifications
+                        {t("settings.pushNotifications")}
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        Receive browser push notifications
+                        {t("settings.pushNotificationsDesc")}
                       </p>
                     </div>
                   </div>
@@ -395,10 +397,10 @@ const Settings = () => {
                     <MessageSquare className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <Label htmlFor="workflow-alerts" className="font-medium">
-                        Workflow Alerts
+                        {t("settings.workflowAlerts")}
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        Get notified when workflows complete or fail
+                        {t("settings.workflowAlertsDesc")}
                       </p>
                     </div>
                   </div>
@@ -416,10 +418,10 @@ const Settings = () => {
                     <Bell className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <Label htmlFor="weekly-digest" className="font-medium">
-                        Weekly Digest
+                        {t("settings.weeklyDigest")}
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        Receive a weekly summary of activity
+                        {t("settings.weeklyDigestDesc")}
                       </p>
                     </div>
                   </div>
@@ -506,14 +508,14 @@ const Settings = () => {
                   <div className="flex items-center gap-3">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="font-medium">Profile</p>
+                      <p className="font-medium">{t("nav.profile")}</p>
                       <p className="text-sm text-muted-foreground">
-                        Update your profile information
+                        {t("profile.title")}
                       </p>
                     </div>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => navigate("/profile")}>
-                    Edit Profile
+                    {t("common.edit")}
                   </Button>
                 </div>
 
@@ -523,33 +525,32 @@ const Settings = () => {
                   <div className="flex items-center gap-3">
                     <Trash2 className="h-4 w-4 text-destructive" />
                     <div>
-                      <p className="font-medium text-destructive">Delete Account</p>
+                      <p className="font-medium text-destructive">{t("settings.deleteAccount")}</p>
                       <p className="text-sm text-muted-foreground">
-                        Permanently delete your account and data
+                        {t("settings.deleteAccountDesc")}
                       </p>
                     </div>
                   </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" size="sm">
-                        Delete Account
+                        {t("settings.deleteAccountBtn")}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogTitle>{t("settings.deleteAccount")}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete your
-                          account and remove all of your data from our servers.
+                          {t("settings.deleteAccountWarning")}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t("settings.cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={handleDeleteAccount}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Delete Account
+                          {t("settings.deleteAccountBtn")}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -567,10 +568,10 @@ const Settings = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-primary" />
-              Set Up Two-Factor Authentication
+              {t("settings.setup2FATitle")}
             </DialogTitle>
             <DialogDescription>
-              Scan the QR code with your authenticator app (like Google Authenticator or Authy), then enter the 6-digit code to verify.
+              {t("settings.setup2FADesc")}
             </DialogDescription>
           </DialogHeader>
           
@@ -582,7 +583,7 @@ const Settings = () => {
                 </div>
                 {secret && (
                   <div className="text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Can't scan? Enter this code manually:</p>
+                    <p className="text-xs text-muted-foreground mb-1">{t("settings.manualEntry")}</p>
                     <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all">
                       {secret}
                     </code>
@@ -592,7 +593,7 @@ const Settings = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="verify-code">Verification Code</Label>
+              <Label htmlFor="verify-code">{t("settings.enterVerificationCode")}</Label>
               <Input
                 id="verify-code"
                 placeholder="000000"
@@ -614,7 +615,7 @@ const Settings = () => {
                 setSecret(null);
               }}
             >
-              Cancel
+              {t("settings.cancel")}
             </Button>
             <Button 
               onClick={handleVerifyEnrollment}
@@ -623,10 +624,10 @@ const Settings = () => {
               {verifying ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Verifying...
+                  {t("settings.verifying")}
                 </>
               ) : (
-                "Verify & Enable"
+                t("settings.verifyEnable")
               )}
             </Button>
           </DialogFooter>
@@ -637,13 +638,13 @@ const Settings = () => {
       <AlertDialog open={unenrollDialogOpen} onOpenChange={setUnenrollDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Disable Two-Factor Authentication?</AlertDialogTitle>
+            <AlertDialogTitle>{t("settings.disable2FATitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the extra security layer from your account. You can always enable it again later.
+              {t("settings.disable2FADesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={unenrolling}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={unenrolling}>{t("settings.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleUnenrollMfa}
               disabled={unenrolling}
@@ -652,10 +653,10 @@ const Settings = () => {
               {unenrolling ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Disabling...
+                  {t("settings.disabling")}
                 </>
               ) : (
-                "Disable 2FA"
+                t("settings.disable2FA")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
