@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useTranslation } from "react-i18next";
 import { Camera, User, Loader2, ArrowLeft, Home, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +36,7 @@ const profileSchema = z.object({
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 const Profile = () => {
+  const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,7 +77,7 @@ const Profile = () => {
         }
       } catch (error) {
         console.error("Error fetching profile:", error);
-        toast.error("Failed to load profile");
+        toast.error(t("profile.failedToLoad"));
       } finally {
         setLoadingProfile(false);
       }
@@ -96,13 +98,13 @@ const Profile = () => {
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
+      toast.error(t("profile.selectImageFile"));
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image must be less than 2MB");
+      toast.error(t("profile.imageTooLarge"));
       return;
     }
 
@@ -135,10 +137,10 @@ const Profile = () => {
       if (updateError) throw updateError;
 
       setAvatarUrl(newAvatarUrl);
-      toast.success("Avatar updated successfully");
+      toast.success(t("profile.avatarUpdated"));
     } catch (error) {
       console.error("Error uploading avatar:", error);
-      toast.error("Failed to upload avatar");
+      toast.error(t("profile.failedToUpload"));
     } finally {
       setUploading(false);
     }
@@ -166,10 +168,10 @@ const Profile = () => {
         console.error("Failed to send profile update email:", emailError);
       }
 
-      toast.success("Profile updated successfully");
+      toast.success(t("profile.profileUpdated"));
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
+      toast.error(t("profile.failedToUpdate"));
     } finally {
       setSaving(false);
     }
@@ -195,7 +197,7 @@ const Profile = () => {
                 <BreadcrumbLink asChild>
                   <Link to="/" className="flex items-center gap-1">
                     <Home className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Home</span>
+                    <span className="hidden sm:inline">{t("breadcrumb.home")}</span>
                   </Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
@@ -204,14 +206,14 @@ const Profile = () => {
               </BreadcrumbSeparator>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link to="/dashboard">Dashboard</Link>
+                  <Link to="/dashboard">{t("breadcrumb.dashboard")}</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator>
                 <ChevronRight className="h-3.5 w-3.5" />
               </BreadcrumbSeparator>
               <BreadcrumbItem>
-                <BreadcrumbPage>Profile</BreadcrumbPage>
+                <BreadcrumbPage>{t("breadcrumb.profile")}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -226,11 +228,11 @@ const Profile = () => {
             className="mb-4 -ml-2"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+            {t("profile.backToDashboard")}
           </Button>
 
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6 sm:mb-8 text-center">
-            Your Profile
+            {t("profile.title")}
           </h1>
 
           <div className="bg-card rounded-2xl p-8 shadow-lg border border-border">
@@ -263,7 +265,7 @@ const Profile = () => {
                 />
               </div>
               <p className="text-sm text-muted-foreground mt-3">
-                Click to upload a new avatar
+                {t("profile.uploadAvatar")}
               </p>
             </div>
 
@@ -275,9 +277,9 @@ const Profile = () => {
                   name="displayName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Display Name</FormLabel>
+                      <FormLabel>{t("profile.displayName")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter your display name" {...field} />
+                        <Input placeholder={t("profile.displayNamePlaceholder")} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -285,10 +287,10 @@ const Profile = () => {
                 />
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Email</label>
+                  <label className="text-sm font-medium text-foreground">{t("profile.email")}</label>
                   <Input value={user?.email || ""} disabled className="bg-muted" />
                   <p className="text-xs text-muted-foreground">
-                    Email cannot be changed
+                    {t("profile.emailCannotChange")}
                   </p>
                 </div>
 
@@ -296,10 +298,10 @@ const Profile = () => {
                   {saving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                      {t("profile.saving")}
                     </>
                   ) : (
-                    "Save Changes"
+                    t("profile.saveChanges")
                   )}
                 </Button>
               </form>

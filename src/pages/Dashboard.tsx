@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { MessageSquare, Calendar, TrendingUp, Clock, Loader2, Trash2, Download, FileJson, FileText, Zap, Sparkles, Shield, BarChart3, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminRole } from "@/hooks/useAdminRole";
@@ -43,6 +44,7 @@ interface Analytics {
 }
 
 const Dashboard = () => {
+  const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdminRole();
   const navigate = useNavigate();
@@ -121,7 +123,7 @@ const Dashboard = () => {
         });
       } catch (error) {
         console.error("Error fetching data:", error);
-        toast.error("Failed to load dashboard data");
+        toast.error(t("dashboard.failedToLoad"));
       } finally {
         setLoading(false);
       }
@@ -147,10 +149,10 @@ const Dashboard = () => {
         ...prev,
         totalConversations: prev.totalConversations - 1,
       }));
-      toast.success("Conversation deleted");
+      toast.success(t("dashboard.conversationDeleted"));
     } catch (error) {
       console.error("Error deleting conversation:", error);
-      toast.error("Failed to delete conversation");
+      toast.error(t("dashboard.failedToDelete"));
     } finally {
       setDeleting(null);
     }
@@ -177,14 +179,14 @@ const Dashboard = () => {
 
       if (exportType === "json") {
         exportAsJSON(exportData);
-        toast.success("Exported as JSON");
+        toast.success(t("dashboard.exportedAsJson"));
       } else {
         exportAsPDF(exportData);
-        toast.success("Exported as PDF");
+        toast.success(t("dashboard.exportedAsPdf"));
       }
     } catch (error) {
       console.error("Error exporting:", error);
-      toast.error("Failed to export conversation");
+      toast.error(t("dashboard.failedToExport"));
     } finally {
       setExporting(null);
     }
@@ -202,34 +204,34 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 pt-24 sm:pt-32 pb-8 sm:pb-16">
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6 sm:mb-8">Dashboard</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6 sm:mb-8">{t("dashboard.title")}</h1>
 
         <Tabs defaultValue="overview" className="space-y-6 sm:space-y-8">
           <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3 sm:grid-cols-5 max-w-3xl' : 'grid-cols-2 sm:grid-cols-4 max-w-2xl'} h-auto`}>
             <TabsTrigger value="overview" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
               <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">Overview</span>
-              <span className="xs:hidden">Stats</span>
+              <span className="hidden xs:inline">{t("dashboard.overview")}</span>
+              <span className="xs:hidden">{t("dashboard.overview")}</span>
             </TabsTrigger>
             <TabsTrigger value="insights" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
               <Sparkles className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">AI Insights</span>
+              <span className="hidden sm:inline">{t("dashboard.aiInsights")}</span>
               <span className="sm:hidden">AI</span>
             </TabsTrigger>
             <TabsTrigger value="workflows" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
               <Zap className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Workflows</span>
-              <span className="sm:hidden">Tasks</span>
+              <span className="hidden sm:inline">{t("dashboard.workflows")}</span>
+              <span className="sm:hidden">{t("dashboard.workflows")}</span>
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
               <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Analytics</span>
-              <span className="sm:hidden">Charts</span>
+              <span className="hidden sm:inline">{t("dashboard.analytics")}</span>
+              <span className="sm:hidden">{t("dashboard.analytics")}</span>
             </TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="admin" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
                 <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
-                Admin
+                {t("dashboard.admin")}
               </TabsTrigger>
             )}
           </TabsList>
@@ -241,7 +243,7 @@ const Dashboard = () => {
               <Card className="bg-card border-border">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
                   <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Conversations
+                    {t("dashboard.conversations")}
                   </CardTitle>
                   <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                 </CardHeader>
@@ -255,7 +257,7 @@ const Dashboard = () => {
               <Card className="bg-card border-border">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
                   <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Messages
+                    {t("dashboard.messages")}
                   </CardTitle>
                   <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                 </CardHeader>
@@ -269,7 +271,7 @@ const Dashboard = () => {
               <Card className="bg-card border-border">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
                   <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Today
+                    {t("dashboard.today")}
                   </CardTitle>
                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                 </CardHeader>
@@ -283,7 +285,7 @@ const Dashboard = () => {
               <Card className="bg-card border-border">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
                   <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    This Week
+                    {t("dashboard.thisWeek")}
                   </CardTitle>
                   <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                 </CardHeader>
@@ -298,16 +300,16 @@ const Dashboard = () => {
             {/* Chat History */}
             <Card className="bg-card border-border">
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-foreground text-lg sm:text-xl">Chat History</CardTitle>
-                <CardDescription className="text-sm">Your recent conversations with AgentAI</CardDescription>
+                <CardTitle className="text-foreground text-lg sm:text-xl">{t("dashboard.chatHistory")}</CardTitle>
+                <CardDescription className="text-sm">{t("dashboard.chatHistoryDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0">
                 {conversations.length === 0 ? (
                   <div className="text-center py-8 sm:py-12">
                     <MessageSquare className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No conversations yet</p>
+                    <p className="text-muted-foreground">{t("dashboard.noConversations")}</p>
                     <p className="text-xs sm:text-sm text-muted-foreground mt-2">
-                      Start chatting with AgentAI to see your history here
+                      {t("dashboard.noConversationsDesc")}
                     </p>
                   </div>
                 ) : (
@@ -348,11 +350,11 @@ const Dashboard = () => {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => handleExport(conversation.id, "json")}>
                                 <FileJson className="h-4 w-4 mr-2" />
-                                Export as JSON
+                                {t("dashboard.exportAsJson")}
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleExport(conversation.id, "pdf")}>
                                 <FileText className="h-4 w-4 mr-2" />
-                                Export as PDF
+                                {t("dashboard.exportAsPdf")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -399,15 +401,15 @@ const Dashboard = () => {
             <TabsContent value="admin" className="space-y-6 sm:space-y-8">
               <div className="flex items-center gap-2 mb-4">
                 <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                <h2 className="text-xl sm:text-2xl font-bold text-foreground">Admin Panel</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground">{t("dashboard.adminPanel")}</h2>
               </div>
               
               <Tabs defaultValue="users" className="space-y-4 sm:space-y-6">
                 <TabsList className="grid w-full max-w-lg grid-cols-2 sm:grid-cols-4 h-auto">
-                  <TabsTrigger value="users" className="text-xs sm:text-sm py-2">Users</TabsTrigger>
-                  <TabsTrigger value="analytics" className="text-xs sm:text-sm py-2">Analytics</TabsTrigger>
-                  <TabsTrigger value="settings" className="text-xs sm:text-sm py-2">Settings</TabsTrigger>
-                  <TabsTrigger value="audit" className="text-xs sm:text-sm py-2">Audit</TabsTrigger>
+                  <TabsTrigger value="users" className="text-xs sm:text-sm py-2">{t("dashboard.users")}</TabsTrigger>
+                  <TabsTrigger value="analytics" className="text-xs sm:text-sm py-2">{t("dashboard.analytics")}</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-xs sm:text-sm py-2">{t("dashboard.settings")}</TabsTrigger>
+                  <TabsTrigger value="audit" className="text-xs sm:text-sm py-2">{t("dashboard.audit")}</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="users">
