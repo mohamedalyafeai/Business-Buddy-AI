@@ -7,6 +7,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// --- Input validation constants ---
+const MAX_NODES = 50;
+const MAX_VARIABLES = 100;
+const MAX_PROMPT_LENGTH = 10000;
+const MAX_EMAIL_BODY_LENGTH = 50000;
+const MAX_EMAIL_SUBJECT_LENGTH = 500;
+const MAX_STRING_CONFIG_LENGTH = 10000;
+const MAX_REGEX_LENGTH = 100;
+const MAX_WORKFLOW_NAME_LENGTH = 200;
+
 interface WorkflowVariable {
   key: string;
   value: string;
@@ -40,6 +50,58 @@ interface WorkflowRequest {
   variables?: WorkflowVariable[];
 }
 
+// UUID validation
+function isValidUUID(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
+// Email validation
+function isValidEmail(email: string): boolean {
+  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+}
+
+// Validate the request input
+function validateRequest(data: WorkflowRequest): string | null {
+  if (!data.workflowId || !isValidUUID(data.workflowId)) {
+    return "Invalid or missing workflowId (must be UUID)";
+  }
+  if (!data.workflowName || data.workflowName.length > MAX_WORKFLOW_NAME_LENGTH) {
+    return `workflowName is required and must be under ${MAX_WORKFLOW_NAME_LENGTH} characters`;
+  }
+  if (!Array.isArray(data.nodes) || data.nodes.length > MAX_NODES) {
+    return `nodes must be an array with at most ${MAX_NODES} items`;
+  }
+  if (data.variables && data.variables.length > MAX_VARIABLES) {
+    return `variables must have at most ${MAX_VARIABLES} items`;
+  }
+  if (data.userId && !isValidUUID(data.userId)) {
+    return "Invalid userId (must be UUID)";
+  }
+  
+  // Validate each node
+  for (const node of data.nodes) {
+    if (!node.id || node.id.length > 100) return "Node id is required and must be under 100 characters";
+    if (!node.nodeType || node.nodeType.length > 50) return "Node nodeType is required and must be under 50 characters";
+    if (node.config) {
+      for (const [key, value] of Object.entries(node.config)) {
+        if (typeof value === 'string' && value.length > MAX_STRING_CONFIG_LENGTH) {
+          return `Node config value for "${key}" exceeds ${MAX_STRING_CONFIG_LENGTH} characters`;
+        }
+      }
+    }
+  }
+
+  // Validate variables
+  if (data.variables) {
+    for (const v of data.variables) {
+      if (!v.key || v.key.length > 50) return "Variable key is required and must be under 50 characters";
+      if (typeof v.value === 'string' && v.value.length > 5000) return "Variable value must be under 5000 characters";
+    }
+  }
+
+  return null;
+}
+
 // Interpolate variables in a string - replaces {{variable_name}} with actual values
 const interpolateVariables = (
   text: string, 
@@ -52,7 +114,7 @@ const interpolateVariables = (
   
   // Replace {{variable_name}} with variable values
   for (const variable of variables) {
-    const pattern = new RegExp(`\\{\\{\\s*${variable.key}\\s*\\}\\}`, 'gi');
+    const pattern = new RegExp(`\\{\\{\\s*${variable.key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\}\\}`, 'gi');
     result = result.replace(pattern, variable.value);
   }
   
@@ -89,7 +151,7 @@ const evaluateCondition = (condition: Condition, context: Record<string, unknown
   const fieldValue = String(context[condition.field] || context.lastAiOutput || context.lastOutput || "");
   const compareValue = condition.value;
 
-  console.log(`Evaluating condition: ${condition.field} ${condition.operator} "${compareValue}" (actual value: "${fieldValue}")`);
+  console.log(`Evaluating condition: ${condition.field} ${condition.operator} "${compareValue}" (actual value: "${fieldValue.substring(0, 100)}")`);
 
   switch (condition.operator) {
     case "contains":
@@ -104,6 +166,16 @@ const evaluateCondition = (condition: Condition, context: Record<string, unknown
       return fieldValue.toLowerCase().endsWith(compareValue.toLowerCase());
     case "regex_match":
       try {
+        // Limit regex complexity to prevent ReDoS
+        if (compareValue.length > MAX_REGEX_LENGTH) {
+          console.error(`Regex pattern too long (${compareValue.length} chars, max ${MAX_REGEX_LENGTH})`);
+          return false;
+        }
+        // Disallow dangerous regex features (lookahead/lookbehind)
+        if (/\(\?[<!=]/.test(compareValue)) {
+          console.error('Lookahead/lookbehind patterns not allowed in regex');
+          return false;
+        }
         const regex = new RegExp(compareValue, "i");
         return regex.test(fieldValue);
       } catch (e) {
@@ -140,7 +212,19 @@ serve(async (req) => {
   let executionId: string | null = null;
 
   try {
-    const { workflowId, workflowName, nodes, conditions, triggerData, userId, variables = [] } = await req.json() as WorkflowRequest;
+    const rawData = await req.json() as WorkflowRequest;
+
+    // Validate input
+    const validationError = validateRequest(rawData);
+    if (validationError) {
+      console.error("Input validation failed:", validationError);
+      return new Response(
+        JSON.stringify({ success: false, error: `Validation error: ${validationError}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { workflowId, workflowName, nodes, conditions, triggerData, userId, variables = [] } = rawData;
     
     console.log(`Executing workflow: ${workflowName} (${workflowId})`);
     console.log(`Nodes: ${nodes.length}, Conditions: ${conditions?.length || 0}, Variables: ${variables.length}`);
@@ -184,7 +268,7 @@ serve(async (req) => {
       }
       
       if (skipUntilAction && node.nodeType === skipUntilAction) {
-        skipUntilAction = null; // Reset, we found our target action
+        skipUntilAction = null;
       }
 
       console.log(`Processing node: ${node.label} (${node.nodeType})`);
@@ -202,7 +286,6 @@ serve(async (req) => {
             nodeOutput = { conditionMet, field: condition.field, operator: condition.operator };
             context.lastConditionResult = conditionMet;
             
-            // Set which action to skip to based on condition result
             if (!conditionMet && condition.elseAction && condition.elseAction !== "skip") {
               skipUntilAction = condition.elseAction;
             } else if (conditionMet && condition.thenAction === "skip") {
@@ -242,7 +325,13 @@ serve(async (req) => {
             const rawPrompt = node.config.prompt || context.lastOutput || "Analyze the following context and provide insights.";
             const userPrompt = interpolateVariables(String(rawPrompt), variables, context);
             
-            console.log(`AI prompt after interpolation: ${userPrompt.substring(0, 100)}...`);
+            // Enforce prompt length limit
+            const truncatedPrompt = userPrompt.substring(0, MAX_PROMPT_LENGTH);
+            if (userPrompt.length > MAX_PROMPT_LENGTH) {
+              console.warn(`Prompt truncated from ${userPrompt.length} to ${MAX_PROMPT_LENGTH} chars`);
+            }
+            
+            console.log(`AI prompt after interpolation: ${truncatedPrompt.substring(0, 100)}...`);
 
             const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
               method: "POST",
@@ -254,7 +343,7 @@ serve(async (req) => {
                 model: "google/gemini-2.5-flash",
                 messages: [
                   { role: "system", content: systemPrompts[node.nodeType] },
-                  { role: "user", content: String(userPrompt) },
+                  { role: "user", content: truncatedPrompt },
                 ],
               }),
             });
@@ -291,10 +380,28 @@ serve(async (req) => {
             const resend = new Resend(RESEND_API_KEY);
             
             // Apply variable interpolation to email fields
-            const to = interpolateVariables(node.config.to || node.config.email || "test@example.com", variables, context);
+            const to = interpolateVariables(node.config.to || node.config.email || "", variables, context);
             const subject = interpolateVariables(node.config.subject || `Workflow: ${workflowName}`, variables, context);
             const rawBody = node.config.body || String(context.lastAiOutput || context.lastOutput || "Workflow executed successfully");
             const body = interpolateVariables(rawBody, variables, context);
+
+            // Validate email address
+            if (!to || !isValidEmail(to)) {
+              throw new Error(`Invalid email address: ${to}`);
+            }
+
+            // Validate subject length and prevent header injection
+            if (subject.length > MAX_EMAIL_SUBJECT_LENGTH) {
+              throw new Error(`Email subject too long (max ${MAX_EMAIL_SUBJECT_LENGTH} characters)`);
+            }
+            if (subject.includes('\n') || subject.includes('\r')) {
+              throw new Error('Invalid characters in email subject (newlines not allowed)');
+            }
+
+            // Validate body length
+            if (body.length > MAX_EMAIL_BODY_LENGTH) {
+              throw new Error(`Email body too long (max ${MAX_EMAIL_BODY_LENGTH} characters)`);
+            }
             
             console.log(`Sending email to: ${to}, subject: ${subject}`);
 
@@ -324,11 +431,10 @@ serve(async (req) => {
 
           // Create Task Action
           case "create_task": {
-            // Apply variable interpolation to task title
             const rawTitle = node.config.title || String(context.lastAiOutput || "New Task from Workflow");
             const taskTitle = interpolateVariables(rawTitle, variables, context);
             const task = {
-              title: taskTitle,
+              title: taskTitle.substring(0, 200),
               priority: node.config.priority || "medium",
               createdAt: new Date().toISOString(),
               workflowId,
@@ -353,9 +459,8 @@ serve(async (req) => {
 
           // Calendar Event Action
           case "calendar_event": {
-            // Apply variable interpolation to calendar event fields
             const event = {
-              title: interpolateVariables(node.config.title || "Workflow Event", variables, context),
+              title: interpolateVariables(node.config.title || "Workflow Event", variables, context).substring(0, 200),
               date: node.config.date || new Date().toISOString(),
               description: String(context.lastAiOutput || ""),
               workflowId,

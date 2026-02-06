@@ -15,7 +15,7 @@ interface WebhookPayload {
 
 // Rate limiting store (in-memory, resets on function cold start)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT = 100; // requests per minute
+const RATE_LIMIT = 60; // requests per minute
 const RATE_LIMIT_WINDOW = 60000; // 1 minute in ms
 
 function checkRateLimit(identifier: string): boolean {
@@ -54,6 +54,11 @@ async function verifySignature(payload: string, signature: string, secret: strin
   } catch {
     return false;
   }
+}
+
+// Validate UUID format
+function isValidUUID(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 }
 
 serve(async (req) => {
@@ -98,6 +103,13 @@ serve(async (req) => {
     if (req.method === "POST" && req.headers.get("content-type")?.includes("application/json")) {
       try {
         rawBody = await req.text();
+        // Limit body size to 1MB
+        if (rawBody.length > 1_000_000) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Request body too large (max 1MB)" }),
+            { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         payload = JSON.parse(rawBody);
       } catch {
         payload = {};
@@ -113,12 +125,16 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           error: "Workflow ID required. Pass via URL path, query param, or request body.",
-          usage: {
-            pathExample: "/webhook-trigger/{workflow-id}",
-            queryExample: "/webhook-trigger?workflowId={workflow-id}",
-            bodyExample: { workflowId: "your-workflow-id", data: {} }
-          }
         }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate workflow ID format (must be UUID)
+    if (!isValidUUID(finalWorkflowId)) {
+      console.log(`Invalid workflow ID format: ${finalWorkflowId}`);
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid workflow ID format" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -151,34 +167,37 @@ serve(async (req) => {
       );
     }
 
-    // Security: Verify webhook secret (REQUIRED if configured)
+    // Security: Webhook secret is REQUIRED - reject if not configured
     const webhookSecret = workflow.trigger_config?.webhookSecret;
-    const requireSecret = workflow.trigger_config?.requireSecret !== false; // Default to true
     
-    if (webhookSecret && requireSecret) {
-      const providedSecret = req.headers.get("x-webhook-secret") || url.searchParams.get("secret");
-      const providedSignature = req.headers.get("x-signature");
-      
-      // Try signature-based authentication first
-      if (providedSignature && rawBody) {
-        const isValidSignature = await verifySignature(rawBody, providedSignature, webhookSecret);
-        if (!isValidSignature) {
-          console.log(`Invalid signature for workflow: ${finalWorkflowId}`);
-          return new Response(
-            JSON.stringify({ success: false, error: "Invalid webhook signature" }),
-            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-      } else if (providedSecret !== webhookSecret) {
-        console.log(`Invalid webhook secret for workflow: ${finalWorkflowId}`);
+    if (!webhookSecret) {
+      console.warn(`REJECTED: Workflow ${finalWorkflowId} has no webhook secret configured`);
+      return new Response(
+        JSON.stringify({ success: false, error: "Webhook secret not configured for this workflow. Please configure a webhook secret in the workflow settings." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify authentication via secret or signature
+    const providedSecret = req.headers.get("x-webhook-secret") || url.searchParams.get("secret");
+    const providedSignature = req.headers.get("x-signature");
+    
+    // Try signature-based authentication first
+    if (providedSignature && rawBody) {
+      const isValidSignature = await verifySignature(rawBody, providedSignature, webhookSecret);
+      if (!isValidSignature) {
+        console.log(`Invalid signature for workflow: ${finalWorkflowId}`);
         return new Response(
-          JSON.stringify({ success: false, error: "Invalid webhook secret" }),
+          JSON.stringify({ success: false, error: "Invalid webhook signature" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-    } else if (!webhookSecret && requireSecret) {
-      // If no secret configured but required, warn in logs
-      console.warn(`WARNING: Workflow ${finalWorkflowId} has no webhook secret configured!`);
+    } else if (!providedSecret || providedSecret !== webhookSecret) {
+      console.log(`Invalid or missing webhook secret for workflow: ${finalWorkflowId}`);
+      return new Response(
+        JSON.stringify({ success: false, error: "Authentication required. Provide x-webhook-secret header or x-signature header." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Timestamp validation (prevent replay attacks)

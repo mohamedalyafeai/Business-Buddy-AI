@@ -516,7 +516,7 @@ const dbToUiWorkflow = (dbWorkflow: DbWorkflow): Workflow => {
   
   // Generate webhook URL for webhook triggers
   const webhookUrl = dbWorkflow.trigger_type === 'webhook' 
-    ? `https://zyediimmjjssdbfekaiu.supabase.co/functions/v1/webhook-trigger/${dbWorkflow.id}`
+    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-trigger/${dbWorkflow.id}`
     : undefined;
 
   return {
@@ -2038,7 +2038,7 @@ export const WorkflowBuilder = () => {
         if (error) throw error;
 
         const webhookUrl = triggerNode?.nodeType === 'webhook' 
-          ? `https://zyediimmjjssdbfekaiu.supabase.co/functions/v1/webhook-trigger/${data.id}`
+          ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-trigger/${data.id}`
           : undefined;
 
         const updatedWorkflow = { ...workflow, id: data.id, isSaved: true, webhookUrl };
