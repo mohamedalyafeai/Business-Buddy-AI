@@ -439,10 +439,10 @@ const Settings = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sun className="h-5 w-5 text-primary" />
-                  Appearance
+                  {t("settings.appearance")}
                 </CardTitle>
                 <CardDescription>
-                  Customize how the app looks and feels
+                  {t("settings.appearanceDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -453,7 +453,7 @@ const Settings = () => {
                     onClick={() => setTheme("light")}
                   >
                     <Sun className="h-5 w-5" />
-                    <span className="text-sm">Light</span>
+                    <span className="text-sm">{t("settings.light")}</span>
                   </Button>
                   <Button
                     variant={theme === "dark" ? "default" : "outline"}
@@ -461,7 +461,7 @@ const Settings = () => {
                     onClick={() => setTheme("dark")}
                   >
                     <Moon className="h-5 w-5" />
-                    <span className="text-sm">Dark</span>
+                    <span className="text-sm">{t("settings.dark")}</span>
                   </Button>
                   <Button
                     variant={theme === "system" ? "default" : "outline"}
@@ -469,7 +469,7 @@ const Settings = () => {
                     onClick={() => setTheme("system")}
                   >
                     <Monitor className="h-5 w-5" />
-                    <span className="text-sm">System</span>
+                    <span className="text-sm">{t("settings.system")}</span>
                   </Button>
                 </div>
               </CardContent>
@@ -480,10 +480,10 @@ const Settings = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5 text-primary" />
-                  Account
+                  {t("settings.account")}
                 </CardTitle>
                 <CardDescription>
-                  Manage your account settings and security
+                  {t("settings.accountDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -491,14 +491,14 @@ const Settings = () => {
                   <div className="flex items-center gap-3">
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="font-medium">Password</p>
+                      <p className="font-medium">{t("settings.password")}</p>
                       <p className="text-sm text-muted-foreground">
-                        Change your account password
+                        {t("settings.changePassword")}
                       </p>
                     </div>
                   </div>
                   <Button variant="outline" size="sm" onClick={handleChangePassword}>
-                    Change Password
+                    {t("settings.changePasswordBtn")}
                   </Button>
                 </div>
 

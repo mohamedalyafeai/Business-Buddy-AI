@@ -324,7 +324,7 @@ const Dashboard = () => {
                             {conversation.title}
                           </h3>
                           <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 text-xs sm:text-sm text-muted-foreground">
-                            <span>{conversation.message_count} messages</span>
+                            <span>{conversation.message_count} {t("dashboard.messages").toLowerCase()}</span>
                             <span className="hidden sm:inline">•</span>
                             <span>
                               {format(new Date(conversation.updated_at), "MMM d, yyyy")}
