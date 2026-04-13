@@ -12,3 +12,10 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /settings
+Disallow: /auth
+Disallow: /reset-password
+
+Sitemap: https://agentai.com/sitemap.xml
