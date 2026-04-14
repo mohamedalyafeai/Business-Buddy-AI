@@ -4,13 +4,13 @@ project_id = "zyediimmjjssdbfekaiu"
 verify_jwt = false
 
 [functions.send-notification-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.work-assistant]
-verify_jwt = false
+verify_jwt = true
 
 [functions.productivity-insights]
-verify_jwt = false
+verify_jwt = true
 
 [functions.execute-workflow]
 verify_jwt = false
@@ -31,4 +31,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-notification]
-verify_jwt = false
+verify_jwt = true
