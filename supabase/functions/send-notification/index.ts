@@ -12,21 +12,59 @@ serve(async (req) => {
   }
 
   try {
-    const { user_id, title, message, type, action_url, send_email } = await req.json();
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
       throw new Error("Missing Supabase configuration");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Authenticate the caller
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { user_id, title, message, type, action_url, send_email } = await req.json();
+
+    // Users can only create notifications for themselves (admins can notify others)
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (user_id !== user.id) {
+      // Check if caller is admin
+      const { data: roleData } = await serviceClient
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (!roleData) {
+        return new Response(JSON.stringify({ error: 'Forbidden: cannot notify other users' }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     console.log(`Creating notification for user ${user_id}: ${title}`);
 
-    // Create in-app notification
-    const { data: notification, error: notificationError } = await supabase
+    const { data: notification, error: notificationError } = await serviceClient
       .from('notifications')
       .insert({
         user_id,
@@ -43,13 +81,11 @@ serve(async (req) => {
       throw notificationError;
     }
 
-    // Optionally send email notification
     if (send_email) {
       const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
       
       if (RESEND_API_KEY) {
-        // Get user email
-        const { data: userData } = await supabase.auth.admin.getUserById(user_id);
+        const { data: userData } = await serviceClient.auth.admin.getUserById(user_id);
         
         if (userData?.user?.email) {
           const emailResponse = await fetch("https://api.resend.com/emails", {
