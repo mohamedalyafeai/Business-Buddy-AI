@@ -4,8 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Mail, Lock, User, ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Sparkles, Mail, Lock, User, ArrowLeft, Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useRateLimit } from "@/hooks/useRateLimit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -25,6 +26,11 @@ export default function Auth() {
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const { user, signIn, signUp, resetPassword } = useAuth();
   const navigate = useNavigate();
+  const { isLocked, recordAttempt, getRemainingLockTime, remainingAttempts } = useRateLimit({
+    maxAttempts: 5,
+    windowMs: 60_000,
+    lockoutMs: 60_000,
+  });
 
   useEffect(() => {
     if (user) {
@@ -34,6 +40,16 @@ export default function Auth() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Rate limit check
+    if (isLocked()) {
+      toast.error(`Too many attempts. Please wait ${getRemainingLockTime()} seconds.`);
+      return;
+    }
+    if (!recordAttempt()) {
+      toast.error(`Too many attempts. Please wait ${getRemainingLockTime()} seconds.`);
+      return;
+    }
     
     // Validate email
     const emailResult = emailSchema.safeParse(email);
@@ -278,7 +294,14 @@ export default function Auth() {
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isLocked() && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>Too many attempts. Please wait {getRemainingLockTime()} seconds before trying again.</span>
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={isSubmitting || isLocked()}>
               {isSubmitting
                 ? "Loading..."
                 : isForgotPassword
@@ -287,6 +310,12 @@ export default function Auth() {
                 ? "Sign In"
                 : "Create Account"}
             </Button>
+
+            {remainingAttempts <= 2 && remainingAttempts > 0 && !isLocked() && (
+              <p className="text-xs text-muted-foreground text-center">
+                {remainingAttempts} attempt{remainingAttempts !== 1 ? "s" : ""} remaining
+              </p>
+            )}
           </form>
 
           {/* Divider and Google Sign In */}
